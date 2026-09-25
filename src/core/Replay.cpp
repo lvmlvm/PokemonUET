@@ -1,5 +1,5 @@
-#include "replay.h"
-#include "RenderWindow.h"
+#include "core/Replay.h"
+#include "core/RenderWindow.h"
 
 #include <SDL.h>
 #include <algorithm>

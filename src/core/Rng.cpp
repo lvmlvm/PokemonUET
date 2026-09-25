@@ -1,4 +1,4 @@
-#include "rng.h"
+#include "core/Rng.h"
 
 #include <cstdlib>
 #include <random>

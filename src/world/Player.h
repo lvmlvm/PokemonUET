@@ -3,8 +3,8 @@
 #include <string>
 #include <SDL.h>
 #include <SDL_image.h>
-#include "otherGraphics.h"
-#include "Pokemon.h"
+#include "ui/OtherGraphics.h"
+#include "battle/Pokemon.h"
 
 extern Pokemon pokemon[];
 

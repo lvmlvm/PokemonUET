@@ -1,6 +1,6 @@
-#include "Variables.h"
-#include "replay.h"
-#include "rng.h"
+#include "Globals.h"
+#include "core/Replay.h"
+#include "core/Rng.h"
 
 // CORE GAME FUNCTIONS
 

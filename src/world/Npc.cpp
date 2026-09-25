@@ -1,7 +1,7 @@
-#include "NPCs.h"
-#include "RenderWindow.h"
-#include "otherGraphics.h"
-#include "Variables.h"
+#include "world/Npc.h"
+#include "core/RenderWindow.h"
+#include "ui/OtherGraphics.h"
+#include "Globals.h"
 #include <iostream>
 
 NPC::NPC() {

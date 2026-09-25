@@ -2,7 +2,7 @@
 
 #include <SDL.h>
 #include <SDL_image.h>
-#include "otherGraphics.h"
+#include "ui/OtherGraphics.h"
 
 class TitleScreenButton {
     private:

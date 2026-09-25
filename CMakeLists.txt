@@ -17,10 +17,10 @@ find_package(SDL2_image CONFIG REQUIRED)
 find_package(SDL2_ttf CONFIG REQUIRED)
 find_package(SDL2_mixer CONFIG REQUIRED)
 
-file(GLOB GAME_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/CPPs/*.cpp)
+file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/*.cpp)
 
 add_executable(pokemon_uet WIN32 ${GAME_SOURCES})
-target_include_directories(pokemon_uet PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(pokemon_uet PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(pokemon_uet PRIVATE
     $<$<TARGET_EXISTS:SDL2::SDL2main>:SDL2::SDL2main>
     SDL2::SDL2

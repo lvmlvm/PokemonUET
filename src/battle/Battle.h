@@ -1,8 +1,8 @@
 #pragma once
 
-#include "BattleScreen.h"
-#include "mPlayer.h"
-#include "Pokemon.h"
+#include "scenes/BattleScreen.h"
+#include "world/Player.h"
+#include "battle/Pokemon.h"
 
 bool useMove(int input, Pokemon &my, Pokemon &op, bool isOpponent);
 

@@ -4,9 +4,9 @@
 #include <SDL_image.h>
 #include <vector>
 #include <string>
-#include "otherGraphics.h"
-#include "RenderWindow.h"
-#include "mPlayer.h"
+#include "ui/OtherGraphics.h"
+#include "core/RenderWindow.h"
+#include "world/Player.h"
 
 class BattleScreenButton {
 	private:

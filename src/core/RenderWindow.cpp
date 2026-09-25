@@ -1,5 +1,5 @@
-#include "RenderWindow.h"
-#include "replay.h"
+#include "core/RenderWindow.h"
+#include "core/Replay.h"
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_ttf.h>

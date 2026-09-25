@@ -1,7 +1,7 @@
-#include "mPlayer.h"
-#include "RenderWindow.h"
-#include "Battle.h"
-#include "Variables.h"
+#include "world/Player.h"
+#include "core/RenderWindow.h"
+#include "battle/Battle.h"
+#include "Globals.h"
 
 #include <iostream>
 #include <fstream>

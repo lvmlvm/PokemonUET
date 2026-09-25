@@ -1,6 +1,6 @@
-#include <RenderWindow.h>
-#include <otherGraphics.h>
-#include "Variables.h"
+#include "core/RenderWindow.h"
+#include "ui/OtherGraphics.h"
+#include "Globals.h"
 
 #include <SDL.h>
 #include <SDL_image.h>

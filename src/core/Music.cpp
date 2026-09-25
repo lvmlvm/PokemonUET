@@ -1,5 +1,5 @@
 #include "iostream"
-#include "music.h"
+#include "core/Music.h"
 
 Music::Music() {
     gameTheme = NULL;

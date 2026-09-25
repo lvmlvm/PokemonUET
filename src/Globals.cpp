@@ -1,4 +1,4 @@
-#include "Variables.h"
+#include "Globals.h"
 
 bool debugMode=false;
 

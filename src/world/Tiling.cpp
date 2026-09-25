@@ -2,8 +2,8 @@
 #include <SDL.h>
 #include <SDL_image.h>
 
-#include "RenderWindow.h"
-#include "Tiling.h"
+#include "core/RenderWindow.h"
+#include "world/Tiling.h"
 
 SDL_Rect* Tile::getClip() {
     return &tileClip;

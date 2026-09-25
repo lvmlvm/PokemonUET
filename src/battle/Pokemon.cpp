@@ -1,5 +1,5 @@
-#include "Pokemon.h"
-#include "rng.h"
+#include "battle/Pokemon.h"
+#include "core/Rng.h"
 
 Pokemon::Pokemon(int i) {
 	data=pokemonData+i;

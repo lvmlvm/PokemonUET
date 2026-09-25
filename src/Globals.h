@@ -1,16 +1,16 @@
 #pragma once
-#include "Pokemon.h"
-#include "RenderWindow.h"
-#include "titleScreen.h"
-#include "music.h"
-#include "Tiling.h"
-#include "map.h"
-#include "mPlayer.h"
-#include "camera.h"
-#include "Battle.h"
-#include "BattleScreen.h"
-#include "NPCs.h"
-#include "otherGraphics.h"
+#include "battle/Pokemon.h"
+#include "core/RenderWindow.h"
+#include "scenes/TitleScreen.h"
+#include "core/Music.h"
+#include "world/Tiling.h"
+#include "world/Map.h"
+#include "world/Player.h"
+#include "world/Camera.h"
+#include "battle/Battle.h"
+#include "scenes/BattleScreen.h"
+#include "world/Npc.h"
+#include "ui/OtherGraphics.h"
 
 using namespace std;
 

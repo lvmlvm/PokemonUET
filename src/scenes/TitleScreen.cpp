@@ -1,7 +1,7 @@
-#include "titleScreen.h"
-#include "RenderWindow.h"
-#include "Variables.h"
-#include "replay.h"
+#include "scenes/TitleScreen.h"
+#include "core/RenderWindow.h"
+#include "Globals.h"
+#include "core/Replay.h"
 #include <iostream>
 
 // TITLE SCREEN:

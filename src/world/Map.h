@@ -4,10 +4,10 @@
 #include <SDL_image.h>
 #include <vector>
 
-#include "NPCs.h"
-#include "music.h"
-#include "camera.h"
-#include "Tiling.h"
+#include "world/Npc.h"
+#include "core/Music.h"
+#include "world/Camera.h"
+#include "world/Tiling.h"
 
 class WarpTile {
     private:

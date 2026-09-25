@@ -1,7 +1,7 @@
-#include "Variables.h"
-#include "RenderWindow.h"
-#include "Battle.h"
-#include "rng.h"
+#include "Globals.h"
+#include "core/RenderWindow.h"
+#include "battle/Battle.h"
+#include "core/Rng.h"
 
 bool useMove(int input, Pokemon &my, Pokemon &op, bool isOpponent) {
 	std::string newBattleSentence;

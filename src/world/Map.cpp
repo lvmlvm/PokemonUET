@@ -1,12 +1,12 @@
 #include <iostream>
 #include <fstream>
 
-#include "Variables.h"
-#include "NPCs.h"
-#include "map.h"
-#include "RenderWindow.h"
-#include "Tiling.h"
-#include "rng.h"
+#include "Globals.h"
+#include "world/Npc.h"
+#include "world/Map.h"
+#include "core/RenderWindow.h"
+#include "world/Tiling.h"
+#include "core/Rng.h"
 
 using namespace std;
 

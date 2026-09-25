@@ -1,10 +1,10 @@
 #include <iostream>
 #include <cmath>
 
-#include "BattleScreen.h"
-#include "RenderWindow.h"
-#include "Variables.h"
-#include "rng.h"
+#include "scenes/BattleScreen.h"
+#include "core/RenderWindow.h"
+#include "Globals.h"
+#include "core/Rng.h"
 
 // BATTLE RENDERING
 

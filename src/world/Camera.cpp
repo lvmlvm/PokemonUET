@@ -1,4 +1,4 @@
-#include <camera.h>
+#include "world/Camera.h"
 
 // Collision lookup that treats anything outside the map (or a missing map) as a wall.
 static bool isBlocked(int** colMap, int mapWidth, int mapHeight, int x, int y) {
