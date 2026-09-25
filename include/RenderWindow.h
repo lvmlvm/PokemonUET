@@ -1,7 +1,7 @@
 #pragma once
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#include <SDL2/SDL_mixer.h>
+#include <SDL.h>
+#include <SDL_image.h>
+#include <SDL_mixer.h>
 
 class RenderWindow {
     public:
@@ -20,3 +20,10 @@ class RenderWindow {
     private:
         SDL_Window* window;
 };
+
+
+// Mouse position carried by a mouse motion/button event (works for real and injected events).
+inline void eventMousePosition(const SDL_Event& ev, int& x, int& y) {
+    if (ev.type == SDL_MOUSEMOTION) { x = ev.motion.x; y = ev.motion.y; }
+    else { x = ev.button.x; y = ev.button.y; }
+}

@@ -1,6 +1,6 @@
 #include "Pokemon.h"
 #include <ctime>
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 Pokemon::Pokemon(int i) {
 	data=pokemonData+i;

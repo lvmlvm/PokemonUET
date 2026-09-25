@@ -1,4 +1,5 @@
 #include "Variables.h"
+#include "replay.h"
 
 // CORE GAME FUNCTIONS
 
@@ -9,9 +10,8 @@ void battleInputProcess(SDL_Event *e);
 void overworldInputProcess(SDL_Event* e, int pCX, int pCY);
 void freeMainAssets();
 
-bool init=initSystem();
-
 int main(int argc, char *argv[]) {
+    initSystem();
     gameLoop();
     freeMainAssets();
     renderWindow.close();
@@ -24,6 +24,7 @@ bool initSystem() {
     TTF_Init();
     Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
     renderWindow.create("Pokémon UET");
+    replay::load();
 
     // LOAD SAVE FILE
     if (!mainPlayer.loadPlayerData()) {

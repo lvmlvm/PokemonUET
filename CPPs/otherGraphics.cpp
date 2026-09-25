@@ -2,9 +2,9 @@
 #include <otherGraphics.h>
 #include "Variables.h"
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#include <SDL2/SDL_ttf.h>
+#include <SDL.h>
+#include <SDL_image.h>
+#include <SDL_ttf.h>
 #include <cmath>
 #include <iostream>
 #include <string>
@@ -100,7 +100,7 @@ void MenuButton::buttonHandler() {
     // 0: INSIDE, 1: HOVER, 2: CLICK
     if (e.type == SDL_MOUSEMOTION or e.type == SDL_MOUSEBUTTONDOWN or e.type == SDL_MOUSEBUTTONUP) {
         int x, y;
-        SDL_GetMouseState(&x, &y);
+        eventMousePosition(e, x, y);
 
         bool inside = true;
         if (x < buttonDest.x) inside = false;

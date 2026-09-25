@@ -1,7 +1,8 @@
 #include "RenderWindow.h"
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#include <SDL2/SDL_ttf.h>
+#include "replay.h"
+#include <SDL.h>
+#include <SDL_image.h>
+#include <SDL_ttf.h>
 using namespace std;
 
 SDL_Renderer* RenderWindow::renderer = nullptr;
@@ -40,6 +41,7 @@ void RenderWindow::render(SDL_Texture* texture, SDL_Rect* clip) {
 }
 
 void RenderWindow::display() {
+    replay::beforePresent();
     SDL_RenderPresent(renderer);
 }
 
