@@ -19,6 +19,8 @@ SCREEN_TILES_X, SCREEN_TILES_Y = 13, 11      # 832x704 window, 64px tiles
 PLAYER_OFFSET_X, PLAYER_OFFSET_Y = 6, 5      # player is drawn at camera tile + (6, 5)
 STEP_FRAMES = 24                              # one tile at walking speed is 16 frames
 WARP_FRAMES = 60                              # fade out + reload + fade in
+BATTLE_TURNS = 24
+TITLE_READY = 520                             # splash (127 + 180 held), logo (125), buttons (~40)
 KEY_FOR = {(0, -1): "W", (0, 1): "S", (-1, 0): "A", (1, 0): "D"}
 
 
@@ -104,9 +106,9 @@ class Script:
 def continue_game(shots):
     s = Script(shots)
     s.comment("title screen with a save file: wait for the intro animation, then Continue")
-    s.frame = 330
+    s.frame = TITLE_READY
     s.shot("20_title_with_save")
-    s.click(416, 406, 90)                   # Continue
+    s.click(416, 406, 130)                  # Continue
     s.shot("21_continued")
     s.tap("V", 30)
     s.click(620, 300, 30)                   # High Score
@@ -133,11 +135,11 @@ def main():
 
     s = Script(shots)
     s.comment("title screen (no save file): wait for the intro animation, then New Game")
-    s.frame = 330
+    s.frame = TITLE_READY
     s.shot("01_title")
-    s.click(416, 434, 60)
+    s.click(416, 434, 90)                   # New Game
     s.shot("02_setup")
-    s.click(230, 380, 90)                   # Ruby
+    s.click(230, 380, 130)                  # Ruby
     s.shot("03_overworld")
 
     s.comment("E3 exterior -> E3 interior -> Student Button Room")
@@ -184,16 +186,17 @@ def main():
     for _ in range(3):                      # intro dialogue
         s.tap("X", 90)
 
-    s.comment("battle turns; the party-slot clicks only matter after a forced switch")
-    for turn in range(14):
+    s.comment("battle turns (enough to finish any battle); the party-slot clicks only matter after a")
+    s.comment("forced switch, and leftover inputs after the battle are harmless in the overworld")
+    for turn in range(BATTLE_TURNS):
         s.click(415, 600, 30)               # Fight
         if turn == 0:
             s.shot("09_moves")
         s.click(172, 555, 30)               # first move
         for _ in range(7):
-            s.tap("X", 80)
+            s.tap("X", 50)                  # the longest animation (a send-out) takes ~42 frames
         for slot_y in (271, 349, 427):      # party slots in the forced-switch screen
-            s.click(396, slot_y, 60)
+            s.click(396, slot_y, 40)
         if turn == 2:
             s.shot("10_mid_battle")
             s.click(117, 602, 30)           # Pokemon button: voluntary switch

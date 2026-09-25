@@ -20,4 +20,5 @@ private:
     TextLabel prompt_;
     Button ruby_, sapphire_;
     Transition transition_ = Transition::FadeIn;
+    int blackFrames_ = 0;
 };

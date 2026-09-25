@@ -51,6 +51,7 @@ private:
     Transition transition_ = Transition::FadeInFromTitle;
     bool transitionMusicLoaded_ = false;
     bool inDialogue_ = false;
+    bool rolledPokemon_ = false; // the Pokemon giver already rolled during this line
     bool running_ = false; // Z held
     int frameX_ = 0, frameY_ = 0; // player position at the start of the frame
 };

@@ -1,10 +1,10 @@
 #include "scenes/SetupScene.h"
 #include "ui/Colors.h"
 #include "scenes/OverworldScene.h"
-#include "core/Replay.h"
 
 namespace {
 const int FADE_STEP = 17;
+const int HOLD_BLACK_FRAMES = 60; // stay black for a second before the overworld appears
 } // namespace
 
 SetupScene::SetupScene(Game& game)
@@ -45,9 +45,8 @@ void SetupScene::frame() {
         fade.draw(renderer_);
     }
     if (transition_ == Transition::ToOverworld) {
-        if (fade.out(FADE_STEP)) {
+        if (fade.out(FADE_STEP) && ++blackFrames_ == HOLD_BLACK_FRAMES) {
             game_.replaceScene(std::make_unique<OverworldScene>(game_));
-            replay::delay(1000);
         }
         fade.draw(renderer_);
     }

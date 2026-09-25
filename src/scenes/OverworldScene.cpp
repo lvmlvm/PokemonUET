@@ -147,9 +147,13 @@ void OverworldScene::drawDialogue() {
 
 // The Student Button Room's slot machine rolls three random Pokemon, then announces them.
 void OverworldScene::updatePokemonGiver(InterTile& tile) {
-    if (tile.sentenceNumber() == 2) { // rolling (re-rolls every frame until the next line)
+    if (tile.sentenceNumber() == 2 && !rolledPokemon_) { // rolling
         for (Pokemon& pokemon : player_.party) pokemon = Pokemon(randomInt(1, psize - 1));
-    } else if (tile.sentenceNumber() == 1 && tile.dialogue.size() > 3) { // talking again: drop the last announcement
+        rolledPokemon_ = true;
+    } else if (tile.sentenceNumber() != 2) {
+        rolledPokemon_ = false;
+    }
+    if (tile.sentenceNumber() == 1 && tile.dialogue.size() > 3) { // talking again: drop the last announcement
         tile.dialogue.pop_back();
     } else if (tile.sentenceNumber() == 3 && tile.dialogue.size() < 4) {
         tile.dialogue.push_back(player_.name() + " received " + player_.party[0].data->name + ", "

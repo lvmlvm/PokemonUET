@@ -1,7 +1,6 @@
 #include "scenes/TitleScene.h"
 #include "scenes/OverworldScene.h"
 #include "scenes/SetupScene.h"
-#include "core/Replay.h"
 
 namespace {
 const int BUTTON_W = 210, BUTTON_H = 55;
@@ -80,16 +79,14 @@ void TitleScene::frame() {
 
     Fade& fade = game_.fade();
     if (transition_ == Transition::ToOverworld) {
-        if (fade.out(FADE_STEP)) {
+        if (fade.out(FADE_STEP) && ++blackFrames_ == 60) { // a second of black
             game_.replaceScene(std::make_unique<OverworldScene>(game_));
-            replay::delay(1000);
         }
         fade.draw(renderer_);
     }
     if (transition_ == Transition::ToSetup) {
-        if (fade.out(FADE_STEP)) {
+        if (fade.out(FADE_STEP) && ++blackFrames_ == 30) { // half a second of black
             game_.replaceScene(std::make_unique<SetupScene>(game_));
-            replay::delay(500);
         }
         fade.draw(renderer_);
     }
@@ -110,8 +107,8 @@ void TitleScene::draw() {
     if (splashTransparency_ < 254) SDL_RenderCopy(renderer_, background_.get(), nullptr, nullptr);
     SDL_SetTextureAlphaMod(splash_.get(), splashTransparency_);
     SDL_RenderCopy(renderer_, splash_.get(), nullptr, nullptr);
-    if (splashTransparency_ == 252) replay::delay(3000);
-    if (splashTransparency_ > 0) splashTransparency_ -= 2;
+    if (splashTransparency_ == 252 && splashHoldFrames_ < 180) splashHoldFrames_++;
+    else if (splashTransparency_ > 0) splashTransparency_ -= 2;
 
     // Then the logo fades in while rising to y = 50.
     if (splashTransparency_ == 0) {
@@ -142,7 +139,7 @@ void TitleScene::draw() {
             for (int i = NEW_GAME; i <= QUIT; i++) buttons_[i].draw(renderer_);
         }
     }
-    if (pos[QUIT] == 0) acceptInput_ = true;
+    if (pos[QUIT] == 0 && transition_ == Transition::None) acceptInput_ = true;
 
     if (inHelpScreen_) {
         SDL_RenderCopy(renderer_, helpScreen_.get(), nullptr, nullptr);

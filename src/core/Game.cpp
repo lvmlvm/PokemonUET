@@ -128,6 +128,7 @@ void Game::applySceneChanges() {
 
 void Game::run() {
     while (!quit_) {
+        const Uint64 frameStart = SDL_GetPerformanceCounter();
         applySceneChanges();
         if (quit_) break;
         Scene& scene = *scenes_.back();
@@ -146,6 +147,17 @@ void Game::run() {
 
         replay::beforePresent(renderer());
         SDL_RenderPresent(renderer());
-        replay::delay(1000 / 60);
+        waitForNextFrame(frameStart);
     }
+}
+
+// The game logic advances one step per frame, so frames are paced at a fixed rate
+// (deliberately not vsync, which would tie the game's speed to the display's refresh rate).
+void Game::waitForNextFrame(Uint64 frameStart) {
+    const double speed = replay::speed();
+    if (speed <= 0) return;
+    const Uint64 frequency = SDL_GetPerformanceFrequency();
+    const Uint64 frameTicks = static_cast<Uint64>(frequency / (FRAMES_PER_SECOND * speed));
+    const Uint64 elapsed = SDL_GetPerformanceCounter() - frameStart;
+    if (elapsed < frameTicks) SDL_Delay(static_cast<Uint32>((frameTicks - elapsed) * 1000 / frequency));
 }

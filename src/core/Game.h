@@ -28,6 +28,7 @@ void playSound(Mix_Chunk* sound);
 class Game {
 public:
     static const int SCREEN_WIDTH = 832, SCREEN_HEIGHT = 704;
+    static constexpr double FRAMES_PER_SECOND = 60.0;
 
     Game();
     void run();
@@ -51,6 +52,7 @@ public:
 private:
     void loadSave();
     void applySceneChanges();
+    void waitForNextFrame(Uint64 frameStart);
 
     SdlContext sdl_; // first member: SDL outlives everything below
     Assets assets_;

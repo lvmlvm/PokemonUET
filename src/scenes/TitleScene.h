@@ -29,9 +29,11 @@ private:
     TexturePtr backTexture_;
     Button backButton_;
     Transition transition_ = Transition::None;
+    int blackFrames_ = 0; // frames spent fully black before switching scenes
 
     // Intro animation
     int splashTransparency_ = 254;
+    int splashHoldFrames_ = 0;
     int logoTransparency_ = 1;
     int logoY_ = 175;
     SDL_Rect logoRect_;

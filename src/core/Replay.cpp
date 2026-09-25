@@ -96,13 +96,12 @@ void replay::load() {
     std::cerr << "replay: loaded " << commands.size() << " commands from " << path << '\n';
 }
 
-void replay::delay(Uint32 ms) {
-    static const double speed = [] {
-        const char* value = std::getenv("POKEMON_REPLAY_SPEED");
-        return value != nullptr ? std::atof(value) : 1.0;
+double replay::speed() {
+    static const double value = [] {
+        const char* setting = std::getenv("POKEMON_REPLAY_SPEED");
+        return setting != nullptr ? std::atof(setting) : 1.0;
     }();
-    if (speed <= 0.0) return;
-    SDL_Delay(static_cast<Uint32>(ms / speed));
+    return value;
 }
 
 void replay::beforePresent(SDL_Renderer* renderer) {
