@@ -12,10 +12,9 @@ BattleScene::BattleScene(Game& game, Trainer& opponent, std::function<void()> re
     : game_(game),
       renderer_(game.renderer()),
       player_(game.player()),
-      opponent_(opponent),
       respawn_(std::move(respawn)),
-      currentPlayerPokemon(&player_.party[0]),
-      currentOpponentPokemon(&opponent.party[0]),
+      engine_(player_.party, player_.name(), opponent, gameRng()),
+      shownOpponent_(&opponent.party[0]),
       partyView_(game.assets(), PartyView::Style::Battle) {
     Assets& assets = game.assets();
 
@@ -28,20 +27,18 @@ BattleScene::BattleScene(Game& game, Trainer& opponent, std::function<void()> re
     playerTrainerTexture_ = player_.gender() == 0 ? assets.texture("battleassets/malefrontsprite.png")
                                                   : assets.texture("battleassets/femalefrontsprite.png");
     opponentTrainerTexture_ = assets.texture(opponent.battleSpritePath);
-    playerPokeTexture_ = pokemonTexture(*currentPlayerPokemon);
-    opponentPokeTexture_ = pokemonTexture(*currentOpponentPokemon);
+    playerPokeTexture_ = pokemonTexture(engine_.playerPokemon());
+    opponentPokeTexture_ = pokemonTexture(*shownOpponent_);
 
-    currPlayHP = {708, 443, playerHpWidth(currentPlayerPokemon->c_hp), 7};
+    currPlayHP = {708, 443, playerHpWidth(engine_.playerPokemon().c_hp), 7};
     currOppoHP = {112, 119, opponentHpWidth(), 7};
     for (int i = 0; i < 4; i++) playerTextureFrames[i] = {i * 80, 0, 80, 80};
 
-    // The intro: three lines, shown before the first turn.
-    log_.dialogues = {
+    intro_ = {
         "You are challenged by " + opponent.name + "!",
-        opponent.name + " sent out " + currentOpponentPokemon->data->name + "!",
-        player_.name() + " sent out " + currentPlayerPokemon->data->name + "!",
+        opponent.name + " sent out " + shownOpponent_->data->name + "!",
+        player_.name() + " sent out " + engine_.playerPokemon().data->name + "!",
     };
-    log_.actions = {"BATTLE_START"};
 
     dialogueText_ = TextLabel(renderer_, assets.font(42));
     playerPokeName_ = TextLabel(renderer_, assets.font(28));
@@ -69,22 +66,22 @@ TexturePtr BattleScene::pokemonTexture(const Pokemon& pokemon) {
     return game_.assets().loadTexture("pokemonassets/" + pokemon.data->name + ".png");
 }
 
-const std::string& BattleScene::actionAt(unsigned int i) const {
-    static const std::string none;
-    return i < log_.actions.size() ? log_.actions[i] : none;
+bool BattleScene::eventIs(unsigned int i, BattleEvent::Kind kind) const {
+    return i < log_.size() && log_[i].kind == kind;
 }
 
-const std::string& BattleScene::dialogueAt(unsigned int i) const {
+const std::string& BattleScene::lineText(unsigned int i) const {
     static const std::string none;
-    return i < log_.dialogues.size() ? log_.dialogues[i] : none;
+    if (startingBattle) return i < intro_.size() ? intro_[i] : none;
+    return i < log_.size() ? log_[i].text : none;
 }
 
 int BattleScene::playerHpWidth(int hp) const {
-    return int(std::ceil(106.0 * (double(hp) / double(currentPlayerPokemon->data->hp))));
+    return int(std::ceil(106.0 * (double(hp) / double(engine_.playerPokemon().data->hp))));
 }
 
 int BattleScene::opponentHpWidth() const {
-    return int(std::ceil(107.0 * (double(currentOpponentPokemon->c_hp) / double(currentOpponentPokemon->data->hp))));
+    return int(std::ceil(107.0 * (double(shownOpponent_->c_hp) / double(shownOpponent_->data->hp))));
 }
 
 // FRAME
@@ -127,12 +124,12 @@ void BattleScene::draw() {
 
     // THE INTRO LINES: the challenge, the opponent's Pokemon, the player's Pokemon
     if (transition_ != Transition::FadeIn && line_ == 0 && startingBattle) {
-        dialogueText_.setText(dialogueAt(line_), TEXT_WHITE);
+        dialogueText_.setText(lineText(line_), TEXT_WHITE);
         dialogueText_.draw(32, 530);
     }
 
     if (line_ == 1 && startingBattle) {
-        dialogueText_.setText(dialogueAt(line_), TEXT_WHITE);
+        dialogueText_.setText(lineText(line_), TEXT_WHITE);
         dialogueText_.draw(32, 530);
         if (opponentSpriteBox.x < 860) opponentSpriteBox.x += 8;
         if (opponentSpriteBox.x > 850 && oppoPokeRect.x > 500) {
@@ -145,7 +142,7 @@ void BattleScene::draw() {
     }
 
     if (line_ == 2 && startingBattle) {
-        dialogueText_.setText(dialogueAt(line_), TEXT_WHITE);
+        dialogueText_.setText(lineText(line_), TEXT_WHITE);
         dialogueText_.draw(32, 530);
         if (playerSpriteBox.x > -240) {
             playerSpriteBox.x -= 8;
@@ -163,14 +160,14 @@ void BattleScene::draw() {
     if (showOHPBar) {
         SDL_RenderCopy(renderer_, oppoHPBar_, nullptr, &oppoHPRect);
         SDL_RenderCopy(renderer_, hpColor_, nullptr, &currOppoHP);
-        oppoPokeName_.setText(currentOpponentPokemon->data->name, TEXT_BLACK);
+        oppoPokeName_.setText(shownOpponent_->data->name, TEXT_BLACK);
         oppoPokeName_.draw(4, 83);
     }
 
     if (showPHPBar) {
         SDL_RenderCopy(renderer_, playerHPBar_, nullptr, &playerHPRect);
         SDL_RenderCopy(renderer_, hpColor_, nullptr, &currPlayHP);
-        playerPokeName_.setText(currentPlayerPokemon->data->name, TEXT_BLACK);
+        playerPokeName_.setText(engine_.playerPokemon().data->name, TEXT_BLACK);
         playerPokeName_.draw(585, 407);
     }
 
@@ -189,7 +186,7 @@ void BattleScene::draw() {
     }
 
     if (!startingBattle && !fightScreen && !moveScreen) {
-        dialogueText_.setText(dialogueAt(line_), TEXT_WHITE);
+        dialogueText_.setText(lineText(line_), TEXT_WHITE);
         dialogueText_.draw(32, 530);
         animateCurrentAction();
     }
@@ -222,10 +219,15 @@ void BattleScene::drawIntro() {
 // Animates the log line being shown. inAnim0 is true while the animation runs; X only
 // advances to the next line once it is done.
 void BattleScene::animateCurrentAction() {
-    const std::string& action = actionAt(line_);
+    using Kind = BattleEvent::Kind;
+    if (line_ >= log_.size()) {
+        inAnim0 = false;
+        return;
+    }
+    const Kind kind = log_[line_].kind;
 
-    if (action == "PLAYER_USE_MOVE" || action == "OPPONENT_USE_MOVE") {
-        const bool byPlayer = action == "PLAYER_USE_MOVE";
+    if (kind == Kind::PlayerUsedMove || kind == Kind::OpponentUsedMove) {
+        const bool byPlayer = kind == Kind::PlayerUsedMove;
         double& moveAnim = byPlayer ? playerPokemonMoveAnim : opponentPokemonMoveAnim;
         SDL_Texture* target = byPlayer ? opponentPokeTexture_.get() : playerPokeTexture_.get();
 
@@ -235,14 +237,13 @@ void BattleScene::animateCurrentAction() {
             moveAnim++;
         } else if (moveAnim == 21 && inAnim0) {
             if (PokemonTransparency == 0) { // hit sound, depending on the effectiveness line that follows
-                const std::string& next = actionAt(line_ + 1);
-                if (next == "MOVE_NOEFFECT") {
+                if (eventIs(line_ + 1, Kind::NoEffect)) {
                     moveAnim = 0;
                     PokemonTransparency = 0;
                     inAnim0 = false;
-                } else if (next == "MOVE_NOT_EFFECTIVE") {
+                } else if (eventIs(line_ + 1, Kind::NotEffective)) {
                     playSound(notEffectiveSFX);
-                } else if (next == "MOVE_SUPER_EFFECTIVE") {
+                } else if (eventIs(line_ + 1, Kind::SuperEffective)) {
                     playSound(superEffectiveSFX);
                 } else {
                     playSound(effectiveSFX);
@@ -257,13 +258,13 @@ void BattleScene::animateCurrentAction() {
                 moveAnim = 0;
                 PokemonTransparency = 0;
                 if (byPlayer) currOppoHP.w = opponentHpWidth();
-                else currPlayHP.w = playerHpWidth(currentPlayerPokemon->c_hp);
+                else currPlayHP.w = playerHpWidth(engine_.playerPokemon().c_hp);
                 inAnim0 = false;
             }
         }
     }
 
-    else if (action == "OPPONENT_FAINT") {
+    else if (kind == Kind::OpponentFainted) {
         if ((halfOppoPokeRect.h > 0 || oppoPokeRect.y < 260) && inAnim0) {
             halfOppoPokeRect.h -= 10;
             oppoPokeRect.y += 24;
@@ -277,12 +278,12 @@ void BattleScene::animateCurrentAction() {
         }
     }
 
-    else if (action == "OPPONENT_NEXT_POKEMON") {
+    else if (kind == Kind::OpponentSentOut) {
         if (oppoPokeRect.x > 500) {
-            if (oppoPokeRect.x == 832) opponentPokeTexture_ = pokemonTexture(opponent_.party[opponentFaintedPokemons]);
+            if (oppoPokeRect.x == 832) opponentPokeTexture_ = pokemonTexture(engine_.opponentPokemon());
             oppoPokeRect.x -= 8;
             if (oppoPokeRect.x < 510) {
-                currentOpponentPokemon = &opponent_.party[opponentFaintedPokemons];
+                shownOpponent_ = &engine_.opponentPokemon();
                 inAnim0 = false;
                 showOHPBar = true;
                 currOppoHP.w = opponentHpWidth();
@@ -290,7 +291,7 @@ void BattleScene::animateCurrentAction() {
         }
     }
 
-    else if (action == "PLAYER_FAINT") {
+    else if (kind == Kind::PlayerFainted) {
         if ((halfPlayerPokeRect.h > 0 || playerPokeRect.y < 540) && inAnim0) {
             halfPlayerPokeRect.h -= 10;
             playerPokeRect.y += 24;
@@ -304,42 +305,42 @@ void BattleScene::animateCurrentAction() {
         }
     }
 
-    else if (action == "FORCE_OPEN_PARTY") {
+    else if (kind == Kind::PlayerMustSwitch) {
         inSelectionScreen = true;
         partyView_.update(player_.party);
         inAnim0 = false;
     }
 
-    else if (action == "PLAYER_NEXT_POKEMON") {
+    else if (kind == Kind::PlayerSentOut) {
         if (playerPokeRect.x < 90) {
             playerPokeRect.x += 8;
             if (playerPokeRect.x > 80) {
                 inAnim0 = false;
                 // After a voluntary switch the bar shows the HP from before the opponent's free hit.
-                int hp = actionAt(line_ - 1) == "PLAYER_WITHDREW_POKEMON" ? playerBeforeAttackHP : currentPlayerPokemon->c_hp;
+                int hp = eventIs(line_ - 1, Kind::PlayerWithdrew) ? playerBeforeAttackHP : engine_.playerPokemon().c_hp;
                 currPlayHP = {708, 443, playerHpWidth(hp), 7};
                 showPHPBar = true;
             }
         }
     }
 
-    else if (action == "PLAYER_WITHDREW_POKEMON") {
+    else if (kind == Kind::PlayerWithdrew) {
         if (playerPokeRect.x > -240) {
             playerPokeRect.x -= 8;
             if (playerPokeRect.x < -230) {
                 inAnim0 = false;
-                playerPokeTexture_ = pokemonTexture(*currentPlayerPokemon);
+                playerPokeTexture_ = pokemonTexture(engine_.playerPokemon());
             }
         }
     }
 
-    else if (action == "PLAYER_DEFEATED") {
+    else if (kind == Kind::PlayerDefeated) {
         player_.endRun();
         respawn_();
         inAnim0 = false;
     }
 
-    else if (action == "END_BATTLE") {
+    else if (kind == Kind::BattleOver) {
         if (transition_ == Transition::None) transition_ = Transition::FadeOut;
     }
 
@@ -366,14 +367,13 @@ void BattleScene::handleEvent(const SDL_Event& e) {
                     fightScreen = true;
                     startingBattle = false;
                     line_ = 0;
-                    log_.clear();
                 }
             }
         } else {
             inAnim0 = true;
             line_++;
             playSound(game_.sounds().aButton);
-            if (line_ == log_.dialogues.size()) {
+            if (line_ == log_.size()) {
                 fightScreen = true;
                 line_ = 0;
                 log_.clear();
@@ -384,7 +384,7 @@ void BattleScene::handleEvent(const SDL_Event& e) {
 
     // THE POKEMON SELECTION SCREEN (can't be closed when a switch is forced)
     if (inSelectionScreen) {
-        const bool forced = actionAt(line_) == "FORCE_OPEN_PARTY";
+        const bool forced = eventIs(line_, BattleEvent::Kind::PlayerMustSwitch);
         if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE && !forced) {
             inSelectionScreen = false;
             return;
@@ -464,84 +464,47 @@ void BattleScene::handleEvent(const SDL_Event& e) {
 void BattleScene::updateMoveLabel(int move) {
     Button& button = moveButtons_[move];
     if (!button.contains(mouseX_, mouseY_)) {
-        moveNames_[move].setText(currentPlayerPokemon->data->move[move]->name, TEXT_BLACK);
+        moveNames_[move].setText(engine_.playerPokemon().data->move[move]->name, TEXT_BLACK);
         button.resetFrame();
     } else {
-        moveNames_[move].setText("PP: " + std::to_string(currentPlayerPokemon->c_pp[move]) + "/" + std::to_string(currentPlayerPokemon->data->move[move]->pp), TEXT_BLACK);
+        const Pokemon& pokemon = engine_.playerPokemon();
+        moveNames_[move].setText("PP: " + std::to_string(pokemon.c_pp[move]) + "/" + std::to_string(pokemon.data->move[move]->pp), TEXT_BLACK);
     }
 }
 
 // TURNS
 
-void BattleScene::logOpponentFainted() {
-    log_.add("The opposing " + currentOpponentPokemon->data->name + " fainted!", "OPPONENT_FAINT");
-
-    player_.addScore(currentOpponentPokemon->data->hp);
-    log_.add(player_.name() + " scored " + std::to_string(currentOpponentPokemon->data->hp) + " points!", "PLAYER_GAIN_SCORE");
-
-    opponentFaintedPokemons++;
-    if (opponentFaintedPokemons < 3) {
-        log_.add(opponent_.name + " sent out " + opponent_.party[opponentFaintedPokemons].data->name + "!", "OPPONENT_NEXT_POKEMON");
-    } else {
-        log_.add(player_.name() + " defeated " + opponent_.name + "!", "OPPONENT_DEFEATED");
-        log_.add(" ", "END_BATTLE");
+void BattleScene::addEvents(const std::vector<BattleEvent>& events) {
+    for (const BattleEvent& event : events) {
+        if (event.kind == BattleEvent::Kind::ScoreGained) player_.addScore(event.value);
+        log_.push_back(event);
     }
 }
 
-void BattleScene::logPlayerFainted() {
-    log_.add(currentPlayerPokemon->data->name + " fainted!", "PLAYER_FAINT");
-    playerFaintedPokemons++;
-    if (playerFaintedPokemons < 3) {
-        log_.add("Awaiting " + player_.name() + "'s next Pokemon...", "FORCE_OPEN_PARTY");
-    } else {
-        log_.add(player_.name() + " lost to " + opponent_.name + "!", "PLAYER_DEFEATED");
-        log_.add(" ", "END_BATTLE");
-    }
-}
-
-// The faster Pokemon attacks first (the player wins speed ties); a fainted Pokemon doesn't attack.
 void BattleScene::takeTurn(int move) {
-    Pokemon& mine = *currentPlayerPokemon;
-    Pokemon& theirs = *currentOpponentPokemon;
-    if (mine.data->speed >= theirs.data->speed) {
-        if (useMove(log_, move, mine, theirs, false)) {
-            logOpponentFainted();
-        } else {
-            int theirMove = computerChooseMove(theirs, mine);
-            if (useMove(log_, theirMove, theirs, mine, true)) logPlayerFainted();
-        }
-    } else {
-        int theirMove = computerChooseMove(theirs, mine);
-        if (useMove(log_, theirMove, theirs, mine, true)) {
-            logPlayerFainted();
-        } else if (useMove(log_, move, mine, theirs, false)) {
-            logOpponentFainted();
-        }
-    }
+    addEvents(engine_.fight(move));
 }
 
 void BattleScene::switchPokemon(int slot) {
-    Pokemon& chosen = player_.party[slot];
-    if (chosen.c_hp == 0 || currentPlayerPokemon == &chosen) {
+    const bool afterFaint = engine_.playerMustSwitch();
+    std::optional<std::vector<BattleEvent>> events = engine_.switchTo(slot);
+    if (!events) {
         playSound(game_.sounds().denied);
         return;
     }
     playSound(game_.sounds().aButton);
     inSelectionScreen = false;
 
-    if (currentPlayerPokemon->c_hp == 0) { // sending out the next Pokemon after a faint
-        currentPlayerPokemon = &chosen;
-        log_.add(player_.name() + " sent out " + chosen.data->name + "!", "PLAYER_NEXT_POKEMON");
-        playerPokeTexture_ = pokemonTexture(chosen);
+    if (afterFaint) { // play the send-out right away, skipping the "Awaiting..." line
+        addEvents(*events);
+        playerPokeTexture_ = pokemonTexture(engine_.playerPokemon());
         line_++;
-    } else { // switching voluntarily costs the turn: the opponent gets a free attack
-        log_.add(player_.name() + " withdrew " + currentPlayerPokemon->data->name + "!", "PLAYER_WITHDREW_POKEMON");
+    } else { // a voluntary switch: the opponent gets a free attack
         showPHPBar = false;
         fightScreen = false;
-        currentPlayerPokemon = &chosen;
-        log_.add(player_.name() + " sent out " + chosen.data->name + "!", "PLAYER_NEXT_POKEMON");
-        playerBeforeAttackHP = chosen.c_hp;
-        int theirMove = computerChooseMove(*currentOpponentPokemon, chosen);
-        if (useMove(log_, theirMove, *currentOpponentPokemon, chosen, true)) logPlayerFainted();
+        addEvents(*events);
+        for (const BattleEvent& event : *events) {
+            if (event.kind == BattleEvent::Kind::PlayerSentOut) playerBeforeAttackHP = event.value;
+        }
     }
 }

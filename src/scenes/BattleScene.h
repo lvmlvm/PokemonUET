@@ -1,6 +1,6 @@
 #pragma once
 
-#include "battle/Battle.h"
+#include "battle/BattleEngine.h"
 #include "core/Game.h"
 #include "ui/Button.h"
 #include "ui/PartyView.h"
@@ -10,8 +10,9 @@
 #include <functional>
 #include <string>
 
-// A trainer battle. Each player action produces a turn (a BattleLog of dialogue lines and
-// actions); the scene then plays the log back one line per X press, animating each action.
+// A trainer battle, as seen on screen. The BattleEngine decides what happens; each player
+// action produces a list of BattleEvents that the scene plays back one line per X press,
+// animating each event.
 class BattleScene : public Scene {
 public:
     // `respawn` sends the player back to the E3 entrance (after losing or retiring).
@@ -28,11 +29,10 @@ private:
     void animateCurrentAction();
     void takeTurn(int move);
     void switchPokemon(int slot);
-    void logPlayerFainted();
-    void logOpponentFainted();
+    void addEvents(const std::vector<BattleEvent>& events);
     void updateMoveLabel(int move);
-    const std::string& actionAt(unsigned int i) const;
-    const std::string& dialogueAt(unsigned int i) const;
+    bool eventIs(unsigned int i, BattleEvent::Kind kind) const;
+    const std::string& lineText(unsigned int i) const;
     int playerHpWidth(int hp) const;
     int opponentHpWidth() const;
     TexturePtr pokemonTexture(const Pokemon& pokemon);
@@ -40,14 +40,16 @@ private:
     Game& game_;
     SDL_Renderer* renderer_;
     Player& player_;
-    Trainer& opponent_;
     std::function<void()> respawn_;
     Transition transition_ = Transition::FadeIn;
 
-    Pokemon* currentPlayerPokemon;
-    Pokemon* currentOpponentPokemon;
-    BattleLog log_;
-    unsigned int line_ = 0; // the log line being shown
+    BattleEngine engine_;
+    // The opponent's Pokemon on screen. It only changes once the next one's send-out plays,
+    // while the engine moves on as soon as the previous one faints.
+    Pokemon* shownOpponent_;
+    std::array<std::string, 3> intro_;  // shown before the first turn
+    std::vector<BattleEvent> log_;      // the current turn
+    unsigned int line_ = 0;             // the line being shown
 
     // Textures
     SDL_Texture* background_;
@@ -71,7 +73,6 @@ private:
     SDL_Rect halfPlayerPokeRect = {0, 0, 96, 96}, halfOppoPokeRect = {96, 0, 96, 96}; // back / front sprite
     std::array<SDL_Rect, 4> playerTextureFrames;
     int currentPlayerFrame = 0;
-    int playerFaintedPokemons = 0, opponentFaintedPokemons = 0;
     int playerBeforeAttackHP = 0;
     double pCirX = 0, oCirX = 0, playerPokemonMoveAnim = 0, opponentPokemonMoveAnim = 0, PokemonTransparency = 0;
 
