@@ -28,35 +28,40 @@ RUNTIME="$(mktemp -d)"
 trap 'rm -rf "$RUNTIME"' EXIT
 ln -s "$ROOT/assets" "$RUNTIME/res"
 mkdir -p "$RUNTIME/data" "$OUT/bmp"
-rm -f "$OUT"/bmp/*.bmp "$OUT"/*.png
+rm -f "$OUT"/bmp/*.bmp "$OUT"/*.png "$OUT"/*.txt "$OUT"/*.log
 
-python3 "$ROOT/tools/smoke/make_playthrough.py" "$ROOT/assets" "$OUT/bmp" > "$OUT/playthrough.txt"
+# Two launches: a new game played through, then a restart that continues from its save.
+run_game() { # <scenario>
+    local script="$OUT/$1.txt" status=0
+    python3 "$ROOT/tools/smoke/make_playthrough.py" "$ROOT/assets" "$OUT/bmp" "$1" > "$script"
+    (cd "$RUNTIME" && POKEMON_REPLAY="$script" POKEMON_SEED="${POKEMON_SEED:-1}" POKEMON_SAVE_DIR="$RUNTIME/data" \
+        POKEMON_REPLAY_SPEED="${SMOKE_SPEED:-2}" \
+        ASAN_OPTIONS=halt_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+        perl -e 'alarm shift; exec @ARGV or die' "${SMOKE_TIMEOUT:-900}" "$BUILD/pokemon_uet") > "$OUT/$1.log" 2>&1 || status=$?
 
-status=0
-(cd "$RUNTIME" && POKEMON_REPLAY="$OUT/playthrough.txt" POKEMON_SEED="${POKEMON_SEED:-1}" \
-    POKEMON_REPLAY_SPEED="${SMOKE_SPEED:-2}" \
-    ASAN_OPTIONS=halt_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
-    perl -e 'alarm shift; exec @ARGV or die' "${SMOKE_TIMEOUT:-900}" "$BUILD/pokemon_uet") > "$OUT/game.log" 2>&1 || status=$?
-if [ "$status" -eq 142 ]; then
-    echo "SMOKE TEST FAILED: timed out after ${SMOKE_TIMEOUT:-900}s (full log: $OUT/game.log)"
-    exit 1
-fi
+    if [ "$status" -eq 142 ]; then
+        echo "SMOKE TEST FAILED ($1): timed out after ${SMOKE_TIMEOUT:-900}s (full log: $OUT/$1.log)"
+        exit 1
+    fi
+    if grep -qE 'ERROR: AddressSanitizer|runtime error:' "$OUT/$1.log"; then
+        grep -E -A12 'ERROR: AddressSanitizer|runtime error:' "$OUT/$1.log" | head -40
+        echo "SMOKE TEST FAILED ($1): sanitizer report (full log: $OUT/$1.log)"
+        exit 1
+    fi
+    if [ "$status" -ne 0 ]; then
+        tail -20 "$OUT/$1.log"
+        echo "SMOKE TEST FAILED ($1): exit code $status (full log: $OUT/$1.log)"
+        exit 1
+    fi
+}
+
+run_game new-game
+if [ -f "$RUNTIME/data/player.sav" ]; then cp "$RUNTIME/data/player.sav" "$OUT/player.sav"; fi
+run_game continue
 
 if command -v sips >/dev/null; then
     for f in "$OUT"/bmp/*.bmp; do [ -e "$f" ] && sips -s format png "$f" --out "$OUT/$(basename "${f%.bmp}").png" >/dev/null; done
 fi
-
-if grep -qE 'ERROR: AddressSanitizer|runtime error:' "$OUT/game.log"; then
-    grep -E -A12 'ERROR: AddressSanitizer|runtime error:' "$OUT/game.log" | head -40
-    echo "SMOKE TEST FAILED: sanitizer report (full log: $OUT/game.log)"
-    exit 1
-fi
-if [ "$status" -ne 0 ]; then
-    tail -20 "$OUT/game.log"
-    echo "SMOKE TEST FAILED: exit code $status (full log: $OUT/game.log)"
-    exit 1
-fi
-if [ -f "$RUNTIME/data/player.sav" ]; then cp "$RUNTIME/data/player.sav" "$OUT/player.sav"; fi
 
 if [ -n "${SMOKE_GOLDEN:-}" ]; then
     mismatches=0

@@ -40,15 +40,12 @@ if(POKEMON_SANITIZE AND NOT MSVC)
     target_link_options(pokemon_uet PRIVATE -fsanitize=address,undefined)
 endif()
 
-# The game currently loads "res/..." and "data/..." relative to the working directory,
-# so the runtime layout next to the executable is: res -> assets, data/ for saves.
+# The game loads its assets from res/ next to the executable.
 set(RUNTIME_DIR $<TARGET_FILE_DIR:pokemon_uet>)
 if(WIN32)
     add_custom_command(TARGET pokemon_uet POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/assets ${RUNTIME_DIR}/res
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${RUNTIME_DIR}/data)
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/assets ${RUNTIME_DIR}/res)
 else()
     add_custom_command(TARGET pokemon_uet POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/assets ${RUNTIME_DIR}/res
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${RUNTIME_DIR}/data)
+        COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/assets ${RUNTIME_DIR}/res)
 endif()

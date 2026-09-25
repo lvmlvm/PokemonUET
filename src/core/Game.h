@@ -40,7 +40,7 @@ public:
     Player& player() { return player_; }
     Trainer& opponent() { return opponent_; }
     bool hasSaveFile() const { return hasSaveFile_; }
-    bool savePlayer() { return player_.save(SAVE_FILE); }
+    bool savePlayer();
 
     // Scene changes take effect at the start of the next frame.
     void replaceScene(std::unique_ptr<Scene> scene);
@@ -49,8 +49,7 @@ public:
     void quit() { quit_ = true; }
 
 private:
-    static constexpr const char* SAVE_FILE = "data/player.sav";
-
+    void loadSave();
     void applySceneChanges();
 
     SdlContext sdl_; // first member: SDL outlives everything below
@@ -60,6 +59,7 @@ private:
     Sounds sounds_;
     Trainer opponent_; // rolled once at startup, re-rolled for every battle
     Player player_;
+    std::string saveFile_;
     bool hasSaveFile_ = false;
     bool quit_ = false;
 

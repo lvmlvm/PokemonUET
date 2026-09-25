@@ -6,7 +6,10 @@ Button Room (get Pokemon) -> G2 -> first challenge room -> battle (fight, switch
 forced switches) -> menu (party, save, high scores) -> quit. Routes are computed with
 BFS over the collision layers of the shipped .map files, so they follow map edits.
 
-Usage: make_playthrough.py <assets dir> <screenshot dir>  > playthrough.txt
+Scenario "continue" relaunches on the save the new-game playthrough left behind: Continue,
+then check the menu's high scores and quit.
+
+Usage: make_playthrough.py <assets dir> <screenshot dir> [new-game|continue]  > script.txt
 """
 import sys
 from collections import deque
@@ -98,8 +101,28 @@ class Script:
         self.pos = arrive
 
 
+def continue_game(shots):
+    s = Script(shots)
+    s.comment("title screen with a save file: wait for the intro animation, then Continue")
+    s.frame = 330
+    s.shot("20_title_with_save")
+    s.click(416, 406, 90)                   # Continue
+    s.shot("21_continued")
+    s.tap("V", 30)
+    s.click(620, 300, 30)                   # High Score
+    s.shot("22_highscores_after_restart")
+    s.click(640, 490, 30)
+    s.tap("Escape", 30)
+    s.at("quit", 60)
+    return s
+
+
 def main():
     assets, shots = Path(sys.argv[1]), sys.argv[2]
+    if len(sys.argv) > 3 and sys.argv[3] == "continue":
+        print("\n".join(continue_game(shots).lines))
+        return
+
     maps = assets / "map"
     e3 = GameMap(maps / "e3.map", False)
     e3i = GameMap(maps / "e3i.map", True)

@@ -24,8 +24,6 @@ public:
     Player() { reset(); }
 
     void reset();                    // a brand-new game
-    bool load(const std::string& path);
-    bool save(const std::string& path) const;
 
     void setGender(int gender);      // 0 = Ruby, 1 = Sapphire; also sets the name
     int gender() const { return gender_; }
@@ -51,6 +49,8 @@ public:
     HighScores highScores;
 
 private:
+    friend class SaveGame;
+
     int gender_ = 0;
     std::string name_;
     int currentMap_ = 0;

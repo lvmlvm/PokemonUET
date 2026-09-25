@@ -1,6 +1,43 @@
 #include "core/Game.h"
 #include "core/Replay.h"
+#include "save/SaveGame.h"
 #include "scenes/TitleScene.h"
+
+#include <cstdlib>
+#include <filesystem>
+#include <iostream>
+#include <optional>
+#include <vector>
+
+namespace {
+// Where saves go: POKEMON_SAVE_DIR if set (tests), otherwise the per-user app data folder
+// (e.g. ~/Library/Application Support/UET/PokemonUET/ on macOS, %APPDATA%\UET\PokemonUET\ on Windows).
+std::string saveDirectory() {
+    if (const char* dir = std::getenv("POKEMON_SAVE_DIR")) {
+        std::error_code ignored;
+        std::filesystem::create_directories(dir, ignored);
+        std::string path = dir;
+        if (!path.empty() && path.back() != '/' && path.back() != '\\') path += '/';
+        return path;
+    }
+    if (char* pref = SDL_GetPrefPath("UET", "PokemonUET")) {
+        std::string path = pref;
+        SDL_free(pref);
+        return path;
+    }
+    return "data/";
+}
+
+// Saves from before the save folder moved: data/player.sav next to the game.
+std::vector<std::string> legacySaveFiles() {
+    std::vector<std::string> paths = {"data/player.sav"};
+    if (char* base = SDL_GetBasePath()) {
+        paths.push_back(std::string(base) + "data/player.sav");
+        SDL_free(base);
+    }
+    return paths;
+}
+} // namespace
 
 Sounds::Sounds(Assets& assets)
     : changeMap(assets.sound("sfx/change_map.wav")),
@@ -20,8 +57,39 @@ Game::Game()
       fade_(assets_.loadTexture("otherassets/blacktransition.png")),
       sounds_(assets_) {
     replay::load();
-    hasSaveFile_ = player_.load(SAVE_FILE);
+    loadSave();
     scenes_.push_back(std::make_unique<TitleScene>(*this));
+}
+
+void Game::loadSave() {
+    saveFile_ = saveDirectory() + "player.sav";
+
+    if (std::filesystem::exists(saveFile_)) {
+        if (std::optional<Player> saved = SaveGame::readFile(saveFile_)) {
+            player_ = *saved;
+            hasSaveFile_ = true;
+        } else {
+            std::cout << "Save file is corrupted! Default player config loaded instead!\n";
+        }
+        return;
+    }
+
+    for (const std::string& legacy : legacySaveFiles()) {
+        if (std::optional<Player> saved = SaveGame::readFile(legacy)) {
+            player_ = *saved;
+            hasSaveFile_ = true;
+            std::cout << "Imported save file " << legacy << " into " << saveFile_ << '\n';
+            savePlayer();
+            return;
+        }
+    }
+    std::cout << "No save file detected! Default player config loaded instead!\n";
+}
+
+bool Game::savePlayer() {
+    bool saved = SaveGame::writeFile(saveFile_, player_);
+    if (!saved) SDL_Log("Failed to save the game to %s", saveFile_.c_str());
+    return saved;
 }
 
 void Game::replaceScene(std::unique_ptr<Scene> scene) {
