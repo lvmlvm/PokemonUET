@@ -8,6 +8,10 @@
 # frame-based, so speed doesn't change the outcome). Battles are reproducible via a fixed
 # POKEMON_SEED. A run that exceeds SMOKE_TIMEOUT seconds (default 900) is killed and fails;
 # the replay harness also force-quits the game shortly after the script ends.
+#
+# Regression check: SMOKE_GOLDEN=<dir> compares every screenshot byte-for-byte with the BMPs
+# in <dir> (e.g. the $OUT/bmp folder of a known-good run). Behaviour-preserving refactors must
+# reproduce them exactly.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD="$ROOT/build-asan"
@@ -23,10 +27,10 @@ fi
 RUNTIME="$(mktemp -d)"
 trap 'rm -rf "$RUNTIME"' EXIT
 ln -s "$ROOT/assets" "$RUNTIME/res"
-mkdir -p "$RUNTIME/data" "$OUT"
-rm -f "$OUT"/*.bmp "$OUT"/*.png
+mkdir -p "$RUNTIME/data" "$OUT/bmp"
+rm -f "$OUT"/bmp/*.bmp "$OUT"/*.png
 
-python3 "$ROOT/tools/smoke/make_playthrough.py" "$ROOT/assets" "$OUT" > "$OUT/playthrough.txt"
+python3 "$ROOT/tools/smoke/make_playthrough.py" "$ROOT/assets" "$OUT/bmp" > "$OUT/playthrough.txt"
 
 status=0
 (cd "$RUNTIME" && POKEMON_REPLAY="$OUT/playthrough.txt" POKEMON_SEED="${POKEMON_SEED:-1}" \
@@ -39,7 +43,7 @@ if [ "$status" -eq 142 ]; then
 fi
 
 if command -v sips >/dev/null; then
-    for f in "$OUT"/*.bmp; do [ -e "$f" ] && sips -s format png "$f" --out "${f%.bmp}.png" >/dev/null && rm "$f"; done
+    for f in "$OUT"/bmp/*.bmp; do [ -e "$f" ] && sips -s format png "$f" --out "$OUT/$(basename "${f%.bmp}").png" >/dev/null; done
 fi
 
 if grep -qE 'ERROR: AddressSanitizer|runtime error:' "$OUT/game.log"; then
@@ -53,4 +57,20 @@ if [ "$status" -ne 0 ]; then
     exit 1
 fi
 if [ -f "$RUNTIME/data/player.sav" ]; then cp "$RUNTIME/data/player.sav" "$OUT/player.sav"; fi
+
+if [ -n "${SMOKE_GOLDEN:-}" ]; then
+    mismatches=0
+    for golden in "$SMOKE_GOLDEN"/*.bmp; do
+        name="$(basename "$golden")"
+        if ! cmp -s "$golden" "$OUT/bmp/$name"; then
+            echo "screenshot differs from golden: $name"
+            mismatches=$((mismatches + 1))
+        fi
+    done
+    if [ "$mismatches" -ne 0 ]; then
+        echo "SMOKE TEST FAILED: $mismatches screenshot(s) differ from $SMOKE_GOLDEN"
+        exit 1
+    fi
+    echo "all screenshots match $SMOKE_GOLDEN"
+fi
 echo "SMOKE TEST PASSED ($(ls "$OUT" | grep -c png) screenshots in $OUT)"
