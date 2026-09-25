@@ -36,17 +36,3 @@ void Npc::draw(SDL_Renderer* renderer, int camX, int camY) const {
     SDL_Rect dest = {x_ * 64 - camX, y_ * 64 - camY - 24, SPRITE_W, SPRITE_H};
     SDL_RenderCopy(renderer, spriteSheet_, &src, &dest);
 }
-
-bool InterTile::talk() {
-    if (cursor_ < dialogue.size()) {
-        cursor_++;
-        return true;
-    }
-    cursor_ = 0;
-    return false;
-}
-
-std::string InterTile::currentSentence() const {
-    if (cursor_ == 0 || cursor_ > dialogue.size()) return "";
-    return dialogue[cursor_ - 1];
-}

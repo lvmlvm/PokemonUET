@@ -8,28 +8,6 @@
 
 namespace {
 const int TILE = 64;
-
-// Asset paths inside .map files are written relative to the game folder ("res/...").
-std::string assetPath(const std::string& path) {
-    const std::string prefix = "res/";
-    return path.compare(0, prefix.size(), prefix) == 0 ? path.substr(prefix.size()) : path;
-}
-
-bool readLine(std::istream& in, std::string& line) {
-    if (!std::getline(in, line)) return false;
-    if (!line.empty() && line.back() == '\r') line.pop_back();
-    return true;
-}
-
-// Reads lines up to (not including) `endMarker`, skipping empty lines.
-std::vector<std::string> readBlock(std::istream& in, const std::string& endMarker) {
-    std::vector<std::string> lines;
-    std::string line;
-    while (readLine(in, line) && line != endMarker) {
-        if (!line.empty()) lines.push_back(line);
-    }
-    return lines;
-}
 } // namespace
 
 // TILE SHEET
@@ -57,64 +35,35 @@ Map::Map(Assets& assets, int mapId, bool playerHasPokemon) {
     if (isChallengeRoom(id_)) addChallengeRoomExit(assets);
 }
 
-// File format: id, height, width, the tile layer, the property layer and (for maps with one)
-// the overlay layer, each followed by an end marker; then NPCs, warp tiles and interactive
-// tiles, each entry introduced by a *_NEXT_* marker and each list ended by a *_STOP marker.
 void Map::load(Assets& assets, const std::string& path) {
     std::ifstream in(path);
-    in >> id_ >> height_ >> width_;
-    if (!in || height_ <= 0 || width_ <= 0) {
+    std::optional<MapData> data = parseMap(in);
+    if (!data) {
         SDL_Log("Failed to load map %s", path.c_str());
-        width_ = height_ = 0;
         return;
     }
+    id_ = data->id;
+    width_ = data->width;
+    height_ = data->height;
+    tiles_ = std::move(data->tiles);
+    properties_ = std::move(data->properties);
+    overlay_ = std::move(data->overlay);
+    warps_ = std::move(data->warps);
+    interTiles_ = std::move(data->interTiles);
 
-    const size_t cells = static_cast<size_t>(width_) * height_;
-    std::string marker;
-    auto readLayer = [&](std::vector<int>& layer) {
-        layer.assign(cells, 0);
-        for (int& value : layer) in >> value;
-        in >> marker; // end-of-layer marker
-    };
-    readLayer(tiles_);
-    readLayer(properties_);
-    if (mapInfo(id_).hasOverlay) readLayer(overlay_);
-
-    while (in >> marker && marker == "MAP_NEXT_NPC") {
-        int x, y, facing;
-        bool isTrainer;
-        std::string sprite;
-        in >> x >> y >> facing >> isTrainer >> sprite;
-
-        auto npc = std::make_unique<Npc>(x, y, facing, assets.spriteSheet(assetPath(sprite)), isTrainer);
-        if (isTrainer) {
-            for (const std::string& sentence : readBlock(in, "NPC_PREBATTLE_END")) npc->addPreBattleDialogue(sentence);
-            readLine(in, npc->trainerName);
-            std::string trainerSprite;
-            readLine(in, trainerSprite);
-            npc->trainerSprite = assetPath(trainerSprite);
-        }
-        for (const std::string& sentence : readBlock(in, "NPC_DIALOGUE_END")) npc->addDialogue(sentence);
-
-        if (x >= 0 && y >= 0 && x < width_ && y < height_) at(properties_, x, y) = OCCUPIED_BY_NPC;
+    for (const NpcData& npcData : data->npcs) {
+        auto npc = std::make_unique<Npc>(npcData.x, npcData.y, npcData.facing, assets.spriteSheet(npcData.sprite), npcData.isTrainer);
+        for (const std::string& sentence : npcData.preBattleDialogue) npc->addPreBattleDialogue(sentence);
+        npc->trainerName = npcData.trainerName;
+        npc->trainerSprite = npcData.trainerSprite;
+        for (const std::string& sentence : npcData.dialogue) npc->addDialogue(sentence);
         npcs_.push_back(std::move(npc));
     }
+}
 
-    while (in >> marker && marker == "WARP_NEXT_TILE") {
-        WarpTile warp{};
-        in >> warp.x >> warp.y >> warp.destMap >> warp.destX >> warp.destY;
-        if (warp.x >= 0 && warp.y >= 0 && warp.x < width_ && warp.y < height_) at(properties_, warp.x, warp.y) = WARP;
-        warps_.push_back(warp);
-    }
-
-    while (in >> marker && marker == "INTER_NEXT_TILE") {
-        int x, y;
-        in >> x >> y;
-        InterTile tile(x, y);
-        tile.dialogue = readBlock(in, "INTER_DIALOGUE_END");
-        if (x >= 0 && y >= 0 && x < width_ && y < height_) at(properties_, x, y) = INTERACTIVE;
-        interTiles_.push_back(tile);
-    }
+void Map::addNpc(std::unique_ptr<Npc> npc) {
+    if (npc->x() >= 0 && npc->y() >= 0 && npc->x() < width_ && npc->y() < height_) at(properties_, npc->x(), npc->y()) = OCCUPIED_BY_NPC;
+    npcs_.push_back(std::move(npc));
 }
 
 // The G2 challenge is closed to players without Pokemon.
@@ -123,8 +72,7 @@ void Map::addG2Guards(Assets& assets) {
         auto guard = std::make_unique<Npc>(x, 9, SOUTH, assets.spriteSheet("npcsprite/npcSprite6.png"));
         guard->addDialogue("I'm sorry, but you must first acquire some Pokemons before you may take the Pokemon UET Challenge.");
         guard->addDialogue("To get your Pokemons, go to the Student Button Room in the E3 Building.");
-        npcs_.push_back(std::move(guard));
-        at(properties_, x, 9) = OCCUPIED_BY_NPC;
+        addNpc(std::move(guard));
     }
 }
 
@@ -135,8 +83,7 @@ void Map::addChallengeRoomExit(Assets& assets) {
 
     auto guard = std::make_unique<Npc>(12, 8, SOUTH, assets.spriteSheet("npcsprite/npcSprite6.png"));
     guard->addDialogue("You must battle and win vs the Trainer to advance to the next room!");
-    npcs_.push_back(std::move(guard));
-    at(properties_, 12, 8) = OCCUPIED_BY_NPC;
+    addNpc(std::move(guard));
 }
 
 int Map::property(int x, int y) const {

@@ -12,18 +12,39 @@ Formerly Pokémon VNU but that is only possible if LTNC is the only subject in t
 - Ngoài battle ra thì trong game cũng có những cái NPC và những object với những trao đổi và than thở... gì gì đó.
 
 
-## Các câu lệnh để chạy game
-**QUAN TRỌNG: Đảm bảo là phiên bản g++ phải là từ v8.1.0 trở lên (kiểm tra bằng cách gõ lệnh g++ --version)**
-### Cách 1: Chạy file run.bat
-### Cách 2: 
-- Git clone hoặc download file zip về. Ở trong thư mục /LTNC2022_UET_Nhom8_PokemonVNU, mở CMD
-- Copy và chạy câu lệnh sau: 
-> g++ -fdiagnostics-color=always -Wall -Wl,-subsystem,windows CPPs\\*.cpp -o build/game -Iinclude/SDL2 -Iinclude -Llib -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer
+## Cách build và chạy game
+Game dùng CMake và SDL2 (kèm SDL2_image, SDL2_ttf, SDL2_mixer), chạy được trên macOS, Linux và Windows.
 
-> cd build
+### macOS
+```sh
+brew install cmake sdl2 sdl2_image sdl2_ttf sdl2_mixer
+./run.sh
+```
 
-> game
+### Linux (Ubuntu/Debian)
+```sh
+sudo apt install cmake g++ libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-mixer-dev
+./run.sh
+```
 
+### Windows
+Cài [Visual Studio](https://visualstudio.microsoft.com/) (C++), CMake và [vcpkg](https://vcpkg.io/), rồi:
+```bat
+vcpkg install sdl2 sdl2-image sdl2-ttf sdl2-mixer[mpg123] --triplet x64-windows
+run.bat -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake
+```
+
+`run.sh` / `run.bat` build game vào thư mục `build/` rồi chạy. Có thể chạy lại trực tiếp bằng `build/pokemon_uet`.
+
+File save được lưu trong thư mục dữ liệu của người dùng (macOS: `~/Library/Application Support/UET/PokemonUET/`, Windows: `%APPDATA%\UET\PokemonUET\`, Linux: `~/.local/share/UET/PokemonUET/`). File `data/player.sav` của phiên bản cũ sẽ được tự động chuyển sang khi mở game lần đầu.
+
+## Dành cho lập trình viên
+- `src/core/`: SDL, tài nguyên (asset), nhạc, hiệu ứng chuyển cảnh, vòng lặp game (`Game`) và giao diện `Scene`.
+- `src/scenes/`: màn hình tiêu đề, chọn nhân vật, bản đồ (overworld) và trận đấu.
+- `src/battle/`: luật chơi của trận đấu (`BattleEngine`) và dữ liệu Pokémon — không phụ thuộc SDL.
+- `src/world/`: bản đồ, camera, NPC, người chơi. `src/save/`: đọc/ghi file save. `src/ui/`: nút bấm, chữ, menu.
+- Unit test: `ctest --test-dir build` (sau khi build).
+- Smoke test: `tools/smoke/run.sh` build bản có AddressSanitizer/UndefinedBehaviorSanitizer rồi tự chơi một ván theo kịch bản (game mới → nhận Pokémon → đấu trong G2 → menu → thoát → mở lại và Continue), lưu ảnh chụp màn hình vào `build-asan/smoke/`. Với `SMOKE_GOLDEN=<thư mục>`, ảnh được so sánh từng pixel với một lần chạy trước để kiểm tra refactor không làm thay đổi game.
 
 ## Phân công nhiệm vụ trong nhóm
 - Ngô Danh Lam: Phát triển cấu trúc Pokémon và hệ thống battle; Xây dựng những hàm và cấu trúc cơ sở của game.

@@ -40,27 +40,3 @@ private:
     std::vector<std::string> preBattleDialogue_;
     unsigned int cursor_ = 0; // 1-based index of the sentence being shown, 0 = not talking
 };
-
-struct WarpTile {
-    int x, y;
-    int destMap, destX, destY;
-};
-
-// A tile the player can inspect (signs, machines, ...).
-class InterTile {
-public:
-    InterTile(int x, int y) : x_(x), y_(y) {}
-
-    bool talk(); // advances the dialogue; false once it is over
-    std::string currentSentence() const;
-    unsigned int sentenceNumber() const { return cursor_; }
-
-    int x() const { return x_; }
-    int y() const { return y_; }
-
-    std::vector<std::string> dialogue;
-
-private:
-    int x_, y_;
-    unsigned int cursor_ = 0;
-};

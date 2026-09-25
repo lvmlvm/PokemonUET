@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Assets.h"
+#include "world/MapData.h"
 #include "world/Npc.h"
 
 #include <memory>
@@ -21,9 +22,6 @@ private:
     SDL_Texture* texture_ = nullptr;
     int columns_ = 0;
 };
-
-// Collision values of the property layer.
-enum TileProperty { WALKABLE = 0, BLOCKED = 1, WARP = 2, INTERACTIVE = 3, OCCUPIED_BY_NPC = 4 };
 
 class Map {
 public:
@@ -49,6 +47,7 @@ public:
 
 private:
     void load(Assets& assets, const std::string& path);
+    void addNpc(std::unique_ptr<Npc> npc);
     void addG2Guards(Assets& assets);
     void addChallengeRoomExit(Assets& assets);
     int& at(std::vector<int>& layer, int x, int y) { return layer[y * width_ + x]; }
