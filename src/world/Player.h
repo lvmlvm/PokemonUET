@@ -1,96 +1,60 @@
 #pragma once
 
-#include <string>
-#include <SDL.h>
-#include <SDL_image.h>
-#include "ui/OtherGraphics.h"
 #include "battle/Pokemon.h"
 
-extern Pokemon pokemon[];
+#include <array>
+#include <string>
 
-struct HighScoreListNode {
-    HighScoreListNode* nextHighScore;
-    int score;
-
-    HighScoreListNode() {
-        nextHighScore = NULL;
-        score = 0;
-    }
-
-    HighScoreListNode(int _score) {
-        nextHighScore = NULL;
-        score = _score;
-    }
-};
-
-class HighScoreList {
-private:
-    HighScoreListNode* head;
-    SDL_Texture* highScoreScreenText;
-    SDL_Rect highScoreScreenRect;
-    Text highScoreTexts[5];    
-
+// The five best scores, highest first.
+class HighScores {
 public:
-    HighScoreList();
-    ~HighScoreList();
+    // Takes the place of the lowest score if it beats any of them.
+    void submit(int score);
+    void reset() { scores_.fill(0); }
 
-    MenuButton backButton;
+    const std::array<int, 5>& scores() const { return scores_; }
+    std::array<int, 5>& scores() { return scores_; }
 
-    void initHighScoreList();
-    void freeHighScoreList();
-    void loadHighScoreList(int highScoreList[]);
-    void printHighScoreList();  
-    void saveHighScoreList(std::ofstream& saveStream);  
-    void updateHighScoreList(int newHighScore);
-    void resetHighScoreList();
-
-    void drawHighScoreScreen();
+private:
+    std::array<int, 5> scores_ = {};
 };
 
-class mPlayer {
-    private:
-        int gender;
-        std::string name;
-        int currentMap;
-        int xCoords, yCoords;
-        int faceDirection;
-        SDL_Texture* playerTexture;
-        SDL_Rect walkFrames[32];
-        int currentHighScore;
-        
-    public:
-        mPlayer();
-        ~mPlayer();
+class Player {
+public:
+    Player() { reset(); }
 
-        Pokemon party[3];
-        int activePokemonCount;
-        HighScoreList playerScoreList;
+    void reset();                    // a brand-new game
+    bool load(const std::string& path);
+    bool save(const std::string& path) const;
 
-        void freePlayer(); // releases SDL resources; call before SDL shuts down
-        bool loadPlayerData();
-        bool savePlayerData();
-        void resetPlayerData();
+    void setGender(int gender);      // 0 = Ruby, 1 = Sapphire; also sets the name
+    int gender() const { return gender_; }
+    const std::string& name() const { return name_; }
 
-        int getGender();
-        std::string getPlayerName();
-        int getCurrentMap();
-        int getXCoords();
-        int getYCoords();
-        int getFacingDirection();
-        SDL_Texture* getPlayerTexture();
-        SDL_Rect* getCurrentFrame();
+    int currentMap() const { return currentMap_; }
+    int x() const { return x_; }
+    int y() const { return y_; }
+    void setPosition(int x, int y, int mapId) { x_ = x; y_ = y; currentMap_ = mapId; }
 
-        void setPlayerGender(int gender);
-        void changeFacingDirect(int direct);
-        void initPlayerTexture();
-        void setPlayerCoords(int x, int y, int mapID);
-        void setFacingDirection(int face) {faceDirection = face;}
+    int facing() const { return facing_; }
+    void setFacing(int facing) { facing_ = facing; }
 
-        void renderStandingPlayer();
-        void renderMovingPlayer();
-        void renderRunningPlayer();
+    bool hasPokemon() const { return party[0].species() != 0; }
+    void healParty(); // back to full HP and PP
 
-        int getCurrentHighScore() {return currentHighScore;}
-        void updateCurrentHighScore(int newXP) {currentHighScore += newXP;}
-        void resetCurrentHighScore() {currentHighScore = 0;}
+    int currentScore() const { return currentScore_; }
+    void addScore(int points) { currentScore_ += points; }
+    // The run is over: record its score and start from zero.
+    void endRun() { highScores.submit(currentScore_); currentScore_ = 0; }
+
+    Pokemon party[3];
+    HighScores highScores;
+
+private:
+    int gender_ = 0;
+    std::string name_;
+    int currentMap_ = 0;
+    int x_ = 0, y_ = 0;
+    int facing_ = 0;
+    int currentScore_ = 0;
 };

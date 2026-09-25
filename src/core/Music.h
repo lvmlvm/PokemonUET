@@ -1,19 +1,20 @@
 #pragma once
-#include <SDL.h>
-#include <SDL_mixer.h>
 
+#include "core/Sdl.h"
+
+#include <string>
+
+// The background theme. Themes play their intro once; every later loop restarts at the
+// theme's repeat point.
 class Music {
-    public:
-        Music();
-        ~Music();
-        bool isPastChord();
-        void freeMusic();
-        void loadMusic(const char* path, double repeatP = 0.0);
-        void play();
-        void manualSkip(double test);
-        void resetChord() {pastChord = false;}
-    private:
-        bool pastChord;
-        double repeatPoint;
-        Mix_Music* gameTheme;
+public:
+    void load(const std::string& path, double repeatPoint = 0.0);
+    void play();                          // (re)starts the theme when it isn't playing
+    void resetChord() { pastChord_ = false; } // next play() starts from the beginning
+    void stop();
+
+private:
+    MusicPtr theme_;
+    double repeatPoint_ = 0.0;
+    bool pastChord_ = false;
 };

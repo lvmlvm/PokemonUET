@@ -1,16 +1,11 @@
-#include "Globals.h"
-#include "core/RenderWindow.h"
 #include "battle/Battle.h"
 #include "core/Rng.h"
 
-bool useMove(int input, Pokemon &my, Pokemon &op, bool isOpponent) {
+bool useMove(BattleLog& log, int input, Pokemon &my, Pokemon &op, bool isOpponent) {
 	std::string newBattleSentence;
 	if (isOpponent == true) newBattleSentence += "Opposing ";
 	newBattleSentence += my.data->name + " used " + (my.data->move[input])->name + "!";
-	mainBattle.battleDialogues.push_back(newBattleSentence);
-
-	if (isOpponent) mainBattle.turnActionQueue.push_back("OPPONENT_USE_MOVE");
-	else mainBattle.turnActionQueue.push_back("PLAYER_USE_MOVE");
+	log.add(newBattleSentence, isOpponent ? "OPPONENT_USE_MOVE" : "PLAYER_USE_MOVE");
 
 	float STAB=1;
 	if (my.data->move[input]->type==my.data->type||my.data->move[input]->type==my.data->stype) STAB=1.5;
@@ -22,22 +17,18 @@ bool useMove(int input, Pokemon &my, Pokemon &op, bool isOpponent) {
 
 	if (TE==0) {
 		if (!isOpponent) {
-			mainBattle.battleDialogues.push_back("It didn't affect the opposing " + op.data->name + "...");
-			mainBattle.turnActionQueue.push_back("MOVE_NOEFFECT");
+			log.add("It didn't affect the opposing " + op.data->name + "...", "MOVE_NOEFFECT");
 		} else {
-			mainBattle.battleDialogues.push_back("It didn't affect " + op.data->name + "...");
-			mainBattle.turnActionQueue.push_back("MOVE_NOEFFECT");
+			log.add("It didn't affect " + op.data->name + "...", "MOVE_NOEFFECT");
 		}
 	}
 
 	else if (TE<1) {
-		mainBattle.battleDialogues.push_back("It's not very effective...");
-		mainBattle.turnActionQueue.push_back("MOVE_NOT_EFFECTIVE");
+		log.add("It's not very effective...", "MOVE_NOT_EFFECTIVE");
 	}
 
 	else if (TE>1) {
-		mainBattle.battleDialogues.push_back("It's super effective!");
-		mainBattle.turnActionQueue.push_back("MOVE_SUPER_EFFECTIVE");
+		log.add("It's super effective!", "MOVE_SUPER_EFFECTIVE");
 	}
 
 	if (!op.c_hp) return true;

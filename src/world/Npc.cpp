@@ -1,138 +1,52 @@
 #include "world/Npc.h"
-#include "core/RenderWindow.h"
-#include "ui/OtherGraphics.h"
-#include "Globals.h"
-#include <iostream>
+#include "world/Direction.h"
 
-NPC::NPC() {
-    npcXCoords = 0, npcYCoords = 0, faceDirection = 0;
-    isTrainer = false, hasBattled = 2;
-    npcTexture = NULL;
-    dialogueCursor = 0;
+namespace {
+const int SPRITE_W = 64, SPRITE_H = 88;
+} // namespace
+
+Npc::Npc(int x, int y, int facing, SDL_Texture* spriteSheet, bool isTrainer)
+    : x_(x), y_(y), facing_(facing), spriteSheet_(spriteSheet), isTrainer_(isTrainer) {}
+
+const std::vector<std::string>& Npc::activeDialogue() const {
+    return (isTrainer_ && !hasBattled_) ? preBattleDialogue_ : dialogue_;
 }
 
-NPC::~NPC() {
-    if (npcTexture != NULL) SDL_DestroyTexture(npcTexture);
-    npcTexture = NULL;
-}
+Npc::Talk Npc::talk(int playerFacing) {
+    if (playerFacing >= SOUTH && playerFacing <= WEST) facing_ = oppositeDirection(playerFacing);
 
-void NPC::initNPC(int x, int y, int face, const char* texturePath, bool canBattle) {
-    npcXCoords = x, npcYCoords = y, faceDirection = face, isTrainer = canBattle;
-
-    if (isTrainer) hasBattled = 0;
-
-    if (npcTexture != NULL) SDL_DestroyTexture(npcTexture);
-    npcTexture = NULL;
-    SDL_Surface* tempSurface = IMG_Load(texturePath);
-    if (tempSurface == NULL) {
-        std::cerr << "Failed to load " << texturePath << ": " << IMG_GetError() << '\n';
-    } else {
-        SDL_SetColorKey(tempSurface, SDL_TRUE, SDL_MapRGB(tempSurface->format, 0, 255, 255));
-        npcTexture = SDL_CreateTextureFromSurface(RenderWindow::renderer, tempSurface);
-        SDL_FreeSurface(tempSurface);
+    if (cursor_ < activeDialogue().size()) {
+        cursor_++;
+        return Talk::Talking;
     }
-    
-    for (int i = 0; i < 16; i++) {
-        walkFrames[i] = {i*64, 0, 64, 88};
+    cursor_ = 0;
+    return (isTrainer_ && !hasBattled_) ? Talk::StartBattle : Talk::Finished;
+}
+
+std::string Npc::currentSentence() const {
+    const std::vector<std::string>& sentences = activeDialogue();
+    if (cursor_ == 0 || cursor_ > sentences.size()) return "";
+    return sentences[cursor_ - 1];
+}
+
+void Npc::draw(SDL_Renderer* renderer, int camX, int camY) const {
+    // Standing frame for each direction: frames 0, 4, 8, 12 of the walk sheet.
+    int frame = (facing_ >= SOUTH && facing_ <= WEST) ? facing_ * 4 : 0;
+    SDL_Rect src = {frame * SPRITE_W, 0, SPRITE_W, SPRITE_H};
+    SDL_Rect dest = {x_ * 64 - camX, y_ * 64 - camY - 24, SPRITE_W, SPRITE_H};
+    SDL_RenderCopy(renderer, spriteSheet_, &src, &dest);
+}
+
+bool InterTile::talk() {
+    if (cursor_ < dialogue.size()) {
+        cursor_++;
+        return true;
     }
+    cursor_ = 0;
+    return false;
 }
 
-void NPC::drawNPC(int camX, int camY) {
-    SDL_Rect destBox = {npcXCoords*64 - camX, npcYCoords*64 - camY - 24, 64, 88};
-    switch (faceDirection) {
-    case 0:
-        SDL_RenderCopy(RenderWindow::renderer, npcTexture, &walkFrames[0], &destBox);
-        break;
-    case 1:
-        SDL_RenderCopy(RenderWindow::renderer, npcTexture, &walkFrames[4], &destBox);
-        break;
-    case 2:
-        SDL_RenderCopy(RenderWindow::renderer, npcTexture, &walkFrames[8], &destBox);
-        break;
-    case 3:
-        SDL_RenderCopy(RenderWindow::renderer, npcTexture, &walkFrames[12], &destBox);
-        break;
-    default:
-        SDL_RenderCopy(RenderWindow::renderer, npcTexture, &walkFrames[0], &destBox);
-        break;
-    }
-}
-
-bool NPC::talkNPC(int playerFace) {
-    switch (playerFace) {
-    case 0:
-        faceDirection = 2;
-        break;
-    case 1:
-        faceDirection = 3;
-        break;
-    case 2:
-        faceDirection = 0;
-        break;
-    case 3:
-        faceDirection = 1;
-        break;
-    default:
-        break;
-    }
-
-    if (isTrainer == true)
-    {
-        if (hasBattled == 0) {
-            if (dialogueCursor < preBattleTexts.size()) {
-                dialogueCursor++;
-                return true;
-            } else {
-                dialogueCursor = 0;
-                beginMapToBattleTransition = true;
-                return false;
-            }
-        } else {
-            if (dialogueCursor < dialogueTexts.size()) {
-                dialogueCursor++;
-                return true;
-            } else {
-                dialogueCursor = 0;
-                return false;
-            }
-        }
-    } 
-    else
-    {
-        if (dialogueCursor < dialogueTexts.size()) {
-            dialogueCursor++;
-            return true;
-        } else {
-            dialogueCursor = 0;
-            return false;
-        }
-    }
-
-    
-    // else {
-        
-    //     if (isTrainer == true and hasBattled == 0) {
-    //         beginMapToBattleTransition = true;
-    //     }
-        
-    // }
-}
-
-void NPC::initDialogue(std::string nextSentence) {
-    dialogueTexts.push_back(nextSentence);
-}
-
-void NPC::initPreBattleDialogue(std::string nextSentence) {
-    preBattleTexts.push_back(nextSentence);
-}
-
-std::string NPC::getCurrentSentence()
-{
-    const std::vector<std::string>& texts = (isTrainer == true and hasBattled == 0) ? preBattleTexts : dialogueTexts;
-    if (dialogueCursor == 0 or dialogueCursor > texts.size()) return "";
-    return texts[dialogueCursor - 1];
-}
-
-int NPC::getCurrentSentenceID() {
-    return dialogueCursor;
+std::string InterTile::currentSentence() const {
+    if (cursor_ == 0 || cursor_ > dialogue.size()) return "";
+    return dialogue[cursor_ - 1];
 }

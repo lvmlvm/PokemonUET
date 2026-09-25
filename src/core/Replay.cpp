@@ -1,5 +1,4 @@
 #include "core/Replay.h"
-#include "core/RenderWindow.h"
 
 #include <SDL.h>
 #include <algorithm>
@@ -53,12 +52,12 @@ void pushClick(int x, int y) {
     SDL_PushEvent(&ev);
 }
 
-void screenshot(const std::string& path) {
+void screenshot(SDL_Renderer* renderer, const std::string& path) {
     int w = 0, h = 0;
-    SDL_GetRendererOutputSize(RenderWindow::renderer, &w, &h);
+    SDL_GetRendererOutputSize(renderer, &w, &h);
     SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
     if (surface == nullptr) return;
-    if (SDL_RenderReadPixels(RenderWindow::renderer, nullptr, SDL_PIXELFORMAT_ARGB8888, surface->pixels, surface->pitch) != 0 ||
+    if (SDL_RenderReadPixels(renderer, nullptr, SDL_PIXELFORMAT_ARGB8888, surface->pixels, surface->pitch) != 0 ||
         SDL_SaveBMP(surface, path.c_str()) != 0) {
         std::cerr << "replay: screenshot failed: " << SDL_GetError() << '\n';
     }
@@ -106,7 +105,7 @@ void replay::delay(Uint32 ms) {
     SDL_Delay(static_cast<Uint32>(ms / speed));
 }
 
-void replay::beforePresent() {
+void replay::beforePresent(SDL_Renderer* renderer) {
     const Uint32 now = frame++;
     while (next < commands.size() && commands[next].at <= now) {
         const Command& cmd = commands[next++];
@@ -114,7 +113,7 @@ void replay::beforePresent() {
         if (cmd.op == "down") pushKey(SDL_KEYDOWN, cmd.arg);
         else if (cmd.op == "up") pushKey(SDL_KEYUP, cmd.arg);
         else if (cmd.op == "click") pushClick(cmd.x, cmd.y);
-        else if (cmd.op == "shot") screenshot(cmd.arg);
+        else if (cmd.op == "shot") screenshot(renderer, cmd.arg);
         else if (cmd.op == "quit") {
             SDL_Event ev{};
             ev.type = SDL_QUIT;

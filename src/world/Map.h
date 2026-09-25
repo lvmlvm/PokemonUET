@@ -1,78 +1,67 @@
 #pragma once
 
-#include <SDL.h>
-#include <SDL_image.h>
+#include "core/Assets.h"
+#include "world/Npc.h"
+
+#include <memory>
+#include <string>
 #include <vector>
 
-#include "world/Npc.h"
-#include "core/Music.h"
-#include "world/Camera.h"
-#include "world/Tiling.h"
+class Camera;
 
-class WarpTile {
-    private:
-        int tileX, tileY;
-        int destMap;
-        int destX, destY;
-    public:
-        WarpTile(int _tileX, int _tileY, int _destMap, int _destX, int _destY);
-        ~WarpTile();
-        int getX() {return tileX;}
-        int getY() {return tileY;}
-        int getDestMap() {return destMap;}
-        int getDestX() {return destX;}
-        int getDestY() {return destY;}
+// A tile sheet of 16x16 tiles, drawn scaled to 64x64.
+class TileSheet {
+public:
+    TileSheet() = default;
+    explicit TileSheet(SDL_Texture* texture);
+
+    void drawTile(SDL_Renderer* renderer, int index, const SDL_Rect& dest) const;
+
+private:
+    SDL_Texture* texture_ = nullptr;
+    int columns_ = 0;
 };
 
-class InterTile {
-    private:
-        int tileX, tileY;
-        unsigned int dialogueCursor; // 1-based index of the sentence being shown, 0 = not talking
-    public:
-        std::vector<std::string> dialogueTexts;
-        InterTile(int _tileX, int _tileY);
-        ~InterTile();
-        int getX() {return tileX;}
-        int getY() {return tileY;}
-        void initTileDialogue(std::string nextSentence);
-        bool talkTile();
-        std::string getInterCurrentSentence();
-        int getInterCurrentSentenceID();
-        int getInterDialogueSize() {return dialogueTexts.size();}
-};
+// Collision values of the property layer.
+enum TileProperty { WALKABLE = 0, BLOCKED = 1, WARP = 2, INTERACTIVE = 3, OCCUPIED_BY_NPC = 4 };
 
 class Map {
-    private:
-        int mapID;
-        int** map; //Tile map
-        int** tilePropMap; //Collision, Events Map
-        int** tileOverlayMap; // Stuffs that are drawn on top of players and NPCs
-        int mapWidth;
-        int mapHeight;
-        TileSheet mapSheet;
-        std::vector<NPC*> mapNPCs;
-        std::vector<NPC*> NPCsinFront; // Only used for rendering NPCs that are in front of the players
-        std::vector<WarpTile*> mapWarpTiles;
-        std::vector<InterTile*> mapInterTiles;
-    public:
-        // Music mapTheme;
-        Map();
-        ~Map();
-        void freeMap();
-        void loadMap(const char* path, const char* sheetPath, const char* musicPath, double repeatP = 0.0, bool hasOverlay = false);
-        void drawMap(gameCam* camera);
-        void drawNPCs(gameCam* camera);
-        void drawFrontNPCs(gameCam* camera);
-        // void playMapTheme();
-        void initOverlayElements(const char* path);
-        void freeOverlayElements();
-        void drawOverlay(gameCam* camera);
-        int getMapID() {return mapID;}
-        int getMapWidth();
-        int getMapHeight();
-        void popLastNPC();
-        int** getCollisionMap();
-        NPC* getNearbyNPC(int pCX, int pCY, int playerFace);
-        WarpTile* getNearbyWarpTile(int pCX, int PCY, int playerFace);
-        InterTile* getNearbyInterTile(int pCX, int PCY, int playerFace);
+public:
+    // `playerHasPokemon` decides whether the guards blocking the G2 challenge stay in place.
+    Map(Assets& assets, int mapId, bool playerHasPokemon);
+
+    int id() const { return id_; }
+    int width() const { return width_; }
+    int height() const { return height_; }
+    int property(int x, int y) const; // BLOCKED outside the map
+
+    void draw(SDL_Renderer* renderer, const Camera& camera) const;
+    void drawNpcs(SDL_Renderer* renderer, const Camera& camera);      // NPCs behind the player
+    void drawFrontNpcs(SDL_Renderer* renderer, const Camera& camera) const; // ... and in front
+    void drawOverlay(SDL_Renderer* renderer, const Camera& camera, const TileSheet& overlaySheet) const;
+
+    // What the player standing at (x, y) and facing `facing` is looking at, or null.
+    Npc* npcFacing(int x, int y, int facing);
+    const WarpTile* warpFacing(int x, int y, int facing) const;
+    InterTile* interTileFacing(int x, int y, int facing);
+
+    void removeLastNpc();
+
+private:
+    void load(Assets& assets, const std::string& path);
+    void addG2Guards(Assets& assets);
+    void addChallengeRoomExit(Assets& assets);
+    int& at(std::vector<int>& layer, int x, int y) { return layer[y * width_ + x]; }
+    int at(const std::vector<int>& layer, int x, int y) const { return layer[y * width_ + x]; }
+
+    int id_ = -1;
+    int width_ = 0, height_ = 0;
+    std::vector<int> tiles_;
+    std::vector<int> properties_;
+    std::vector<int> overlay_; // empty when the map has no overlay layer
+    TileSheet sheet_;
+    std::vector<std::unique_ptr<Npc>> npcs_;
+    std::vector<Npc*> npcsInFront_; // rebuilt every frame by drawNpcs()
+    std::vector<WarpTile> warps_;
+    std::vector<InterTile> interTiles_;
 };

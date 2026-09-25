@@ -21,6 +21,6 @@
 
 namespace replay {
     void load();           // reads POKEMON_REPLAY if set; no-op otherwise
-    void beforePresent();  // call once per frame, right before SDL_RenderPresent
+    void beforePresent(SDL_Renderer* renderer); // call once per frame, right before SDL_RenderPresent
     void delay(Uint32 ms); // SDL_Delay, skipped in turbo mode
 }

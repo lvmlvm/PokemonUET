@@ -1,36 +1,20 @@
-#include "iostream"
 #include "core/Music.h"
 
-Music::Music() {
-    gameTheme = NULL;
-    pastChord = false;
-}
-
-Music::~Music() {
-    freeMusic();
-    pastChord = false;
-}
-
-void Music::freeMusic() {
-    Mix_FreeMusic(gameTheme);
-    gameTheme=NULL;
-}
-
-void Music::loadMusic(const char* path, double repeatP) {
-    freeMusic();
-    gameTheme = Mix_LoadMUS(path);
-    repeatPoint = repeatP;
+void Music::load(const std::string& path, double repeatPoint) {
+    theme_.reset(); // stops the current theme
+    theme_.reset(Mix_LoadMUS(path.c_str()));
+    if (!theme_) SDL_Log("Failed to load music %s: %s", path.c_str(), Mix_GetError());
+    repeatPoint_ = repeatPoint;
 }
 
 void Music::play() {
-    if (Mix_PlayingMusic() == 0) {
-        Mix_PlayMusic(gameTheme, 1);
-        if (pastChord == true) Mix_SetMusicPosition(repeatPoint);
-        else pastChord = true;
-    }
+    if (!theme_ || Mix_PlayingMusic() != 0) return;
+    Mix_PlayMusic(theme_.get(), 1);
+    if (pastChord_) Mix_SetMusicPosition(repeatPoint_);
+    else pastChord_ = true;
 }
 
-void Music::manualSkip(double test) {
-    Mix_SetMusicPosition(test);
-    std::cout << "Manual skipped!\n";
+void Music::stop() {
+    Mix_HaltMusic();
+    theme_.reset();
 }

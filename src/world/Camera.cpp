@@ -1,164 +1,74 @@
 #include "world/Camera.h"
+#include "world/Map.h"
 
-// Collision lookup that treats anything outside the map (or a missing map) as a wall.
-static bool isBlocked(int** colMap, int mapWidth, int mapHeight, int x, int y) {
-    if (colMap == NULL or x < 0 or y < 0 or x >= mapWidth or y >= mapHeight) return true;
-    return colMap[y][x] != 0;
+namespace {
+bool isBlocked(const Map& map, int x, int y) {
+    return map.property(x, y) != WALKABLE;
+}
+} // namespace
+
+void Camera::centerOn(int tileX, int tileY) {
+    rect_.x = (tileX - PLAYER_OFFSET_X) * 64;
+    rect_.y = (tileY - PLAYER_OFFSET_Y) * 64;
 }
 
-gameCam::gameCam() {
-    camera = {0, 0, 64*13, 64*11};
-    isMoving = 0, finishMove = 0, moveUp = 0, moveLeft = 0, moveDown = 0, moveRight = 0;
-    movementSpeed = 4;
-}
-
-gameCam::~gameCam() {
-    camera = {0, 0, 0, 0};
-}
-
-void gameCam::setCameraPos(int _x, int _y) {
-    camera.x = _x;
-    camera.y = _y;
-}
-
-void gameCam::beginMovement(SDL_Event* e, int x, int y, int** colMap, int mapWidth, int mapHeight) {
-    switch (e->key.keysym.sym) {
-        case SDLK_w:
-            if (!isBlocked(colMap, mapWidth, mapHeight, x, y-1)) {moveUp = true; break;}
-            else break;               
-        case SDLK_a:     
-            if (!isBlocked(colMap, mapWidth, mapHeight, x-1, y)) {moveLeft = true; break;}
-            else break;                
-        case SDLK_s:           
-            if (!isBlocked(colMap, mapWidth, mapHeight, x, y+1)) {moveDown = true; break;}
-            else break;         
-        case SDLK_d:
-            if (!isBlocked(colMap, mapWidth, mapHeight, x+1, y)) {moveRight = true; break;}                  
-            else break;
-        default:
-            break;
+void Camera::beginMovement(SDL_Keycode key, int x, int y, const Map& map) {
+    switch (key) {
+        case SDLK_w: if (!isBlocked(map, x, y - 1)) moveUp_ = true; break;
+        case SDLK_a: if (!isBlocked(map, x - 1, y)) moveLeft_ = true; break;
+        case SDLK_s: if (!isBlocked(map, x, y + 1)) moveDown_ = true; break;
+        case SDLK_d: if (!isBlocked(map, x + 1, y)) moveRight_ = true; break;
+        default: break;
     }
 }
 
-void gameCam::stopMovement(SDL_Event *e) {
-    switch (e->key.keysym.sym) {
-        case SDLK_w:                        
-            finishMove = true; break;
-        case SDLK_a:                        
-            finishMove = true; break;
-        case SDLK_s:                        
-            finishMove = true; break;
-        case SDLK_d:                        
-            finishMove = true; break;
-        default:
-            break;
+void Camera::stopMovement(SDL_Keycode key) {
+    if (key == SDLK_w || key == SDLK_a || key == SDLK_s || key == SDLK_d) finishMove_ = true;
+}
+
+void Camera::move(int x, int y, const Map& map) {
+    if (moveRight_) {
+        if (isBlocked(map, x + 1, y)) finishMovement();
+        else { isMoving_ = true; rect_.x += speed_; }
+    } else if (moveLeft_) {
+        if (isBlocked(map, x - 1, y)) finishMovement();
+        else { isMoving_ = true; rect_.x -= speed_; }
+    } else if (moveUp_) {
+        if (isBlocked(map, x, y - 1)) finishMovement();
+        else { isMoving_ = true; rect_.y -= speed_; }
+    } else if (moveDown_) {
+        if (isBlocked(map, x, y + 1)) finishMovement();
+        else { isMoving_ = true; rect_.y += speed_; }
     }
 }
 
-void gameCam::moveCamera(int x, int y, int** colMap, int mapWidth, int mapHeight) {
-    if (moveRight == true) {
-        if (isBlocked(colMap, mapWidth, mapHeight, x+1, y)) {
-            finishMovement();
-        }
-        else {
-            isMoving = true; 
-            camera.x += movementSpeed;
-        }
-    } else if (moveLeft == true) {
-        if (isBlocked(colMap, mapWidth, mapHeight, x-1, y)) {
-            finishMovement();
-        }
-        else {
-            isMoving = true; 
-            camera.x -= movementSpeed;
-        } 
-    } else if (moveUp == true) {
-        if (isBlocked(colMap, mapWidth, mapHeight, x, y-1)) {
-            finishMovement();
-        }
-        else {
-            isMoving = true; 
-            camera.y -= movementSpeed;
-        }
-    } else if (moveDown == true) {
-        if (isBlocked(colMap, mapWidth, mapHeight, x, y+1)) {
-            finishMovement();
-        }
-        else {
-            isMoving = true; 
-            camera.y += movementSpeed;
-        }
-    }
-}
-
-void gameCam::finishMovement() {
-    if (moveRight == true) {
-        if (camera.x % 64 != 0) {
-            camera.x += movementSpeed;
+void Camera::finishMovement() {
+    auto settle = [this](bool& direction, int& coordinate, int step) {
+        if (coordinate % 64 != 0) {
+            coordinate += step;
         } else {
-            moveRight = false;
-            isMoving = false;
-            finishMove = false;
+            direction = false;
+            isMoving_ = false;
+            finishMove_ = false;
         }
-    } else if (moveLeft == true) {
-        if (camera.x % 64 != 0) {
-            camera.x -= movementSpeed;
-        } else {
-            isMoving = false;
-            moveLeft = false;
-            finishMove = false;
-        }
-    } else if (moveUp == true) {
-        if (camera.y % 64 != 0) {
-            camera.y -= movementSpeed;
-        } else {
-            isMoving = false;
-            moveUp = false;
-            finishMove = false;
-        }
-    } else if (moveDown == true) {
-        if (camera.y % 64 != 0) {
-            camera.y += movementSpeed;
-        } else {
-            isMoving = false;
-            moveDown = false;
-            finishMove = false;
-        }
-    }    
+    };
+    if (moveRight_) settle(moveRight_, rect_.x, speed_);
+    else if (moveLeft_) settle(moveLeft_, rect_.x, -speed_);
+    else if (moveUp_) settle(moveUp_, rect_.y, -speed_);
+    else if (moveDown_) settle(moveDown_, rect_.y, speed_);
 }
 
-void gameCam::finishIllegalPos(int mapWidth, int mapHeight) { // safety check for when player moves out of bound
-    if (camera.x > mapWidth*64 - 832) {
-        camera.x -= 64;
-    } else if (camera.y > mapHeight*64 - 704) {
-        camera.y -= 64;
-    } else if (camera.x < 0) {
-        camera.x += 64;
-    } else if (camera.y < 0) {
-        camera.y += 64;
-    }
+void Camera::clampToMap(int mapWidth, int mapHeight) {
+    if (rect_.x > mapWidth * 64 - 64 * VIEW_TILES_X) rect_.x -= 64;
+    else if (rect_.y > mapHeight * 64 - 64 * VIEW_TILES_Y) rect_.y -= 64;
+    else if (rect_.x < 0) rect_.x += 64;
+    else if (rect_.y < 0) rect_.y += 64;
 }
 
-void gameCam::speedUp() {
-    if (camera.x % 8 == 0 and camera.y % 8 == 0) movementSpeed = 8;
+void Camera::speedUp() {
+    if (rect_.x % 8 == 0 && rect_.y % 8 == 0) speed_ = 8;
 }
 
-void gameCam::slowDown() {
-    movementSpeed = 4;
-}
-
-bool gameCam::getMovementState() {
-    return isMoving;
-}
-
-bool gameCam::getFinishingState() {
-    return finishMove;
-}
-
-int gameCam::getCamX() {
-    return camera.x;
-}
-
-int gameCam::getCamY() {
-    return camera.y;
+void Camera::slowDown() {
+    speed_ = 4;
 }

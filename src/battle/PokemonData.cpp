@@ -1,85 +1,7 @@
-#include "Globals.h"
+#include "battle/Pokemon.h"
 
-bool debugMode=false;
-
-RenderWindow renderWindow;
-
-SDL_Event e;
-
-TitleScreen gameTitleScreen;
-SDL_Texture* blackTransitionTexture;
-
-std::string gameMaps[] = {
-    "res/map/g2.map",
-    "res/map/e3.map",
-    "res/map/e3i.map",
-    "res/map/g2i.map",
-    "res/map/e3i_2.map",
-    "res/map/chal5.map",
-    "res/map/chal6.map",
-    "res/map/chal7.map",
-    "res/map/chal8.map",
-    "res/map/chal9.map",
-    "res/map/chal10.map",
-    "res/map/chal11.map"
-};
-std::string gameTileSets[] = {
-    "res/tileset/g2o_tiles.png",
-    "res/tileset/e3o_tiles.png",
-    "res/tileset/e3i_tiles.png",
-    "res/tileset/g2i_tiles.png",
-    "res/tileset/e3i_2_tiles.png",
-    "res/tileset/chal5_tiles.png",
-    "res/tileset/chal6_tiles.png",
-    "res/tileset/chal7_tiles.png",
-    "res/tileset/chal8_tiles.png",
-    "res/tileset/chal9_tiles.png",
-    "res/tileset/chal10_tiles.png",
-    "res/tileset/chal11_tiles.png"
-};
-std::string gameThemes[] = {
-    "res/music/g2o_theme.mp3",
-    "res/music/e3o_theme.mp3",
-    "res/music/e3i_theme.mp3",
-    "res/music/e3i_theme.mp3",
-    "res/music/e3i_theme.mp3",
-    "res/music/e3i_theme.mp3",
-    "res/music/e3i_theme.mp3",
-    "res/music/e3i_theme.mp3",
-    "res/music/e3i_theme.mp3",
-    "res/music/e3i_theme.mp3",
-    "res/music/e3i_theme.mp3",
-    "res/music/e3i_theme.mp3"
-};
-double themeRepeats[] = {
-    8.85,
-    30.555,
-    0.77,
-    0.77,
-    0.77,
-    0.77,
-    0.77,
-    0.77,
-    0.77,
-    0.77,
-    0.77,
-    0.77
-};
-bool mapOverlays[] = {
-    false,
-    false,
-    true,
-    true,
-    true,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false
-};
-std::string Type[]= {
+// Type names, indexed by type ID.
+const std::string Type[] = {
     "NULL", // 0
 	"Normal", // 1
 	"Fire", // 2
@@ -101,7 +23,7 @@ std::string Type[]= {
 	"Fairy" // 18
 };
 
-Move moves[]=
+Move moves[] =
 {
 	{"Body Slam",1,85,15},
 	{"Flamethrower",2,90,15},
@@ -122,7 +44,7 @@ Move moves[]=
     {"Iron Head",17,80,15},
     {"Moon Blast",18,95,15}
 };
-PokemonData pokemonData[]=
+PokemonData pokemonData[] =
 {
     {"MissingNo.", 0, 0, 1, 0, 0, 0, {moves,moves,moves,moves}},
     {"Tauros", 1, 0, 135, 105, 75, 115, {moves,moves+6,moves+8,moves+15}}, 
@@ -163,9 +85,9 @@ PokemonData pokemonData[]=
     {"Clefable", 18, 0, 155, 100, 78, 65, {moves+10,moves+17,moves+1,moves}}
 };
 
-int psize=sizeof(pokemonData)/sizeof(pokemonData[0]);
+const int psize = sizeof(pokemonData) / sizeof(pokemonData[0]);
 
-double typeEffectiveness[19][19]={
+const double typeEffectiveness[19][19] = {
     {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
     {1,1,1,1,1,1,1,1,1,1,1,1,1,0.5,0,1,1,0.5,1},
     {1,1,0.5,0.5,1,2,2,1,1,1,1,1,2,0.5,1,0.5,1,2,1},
@@ -186,52 +108,3 @@ double typeEffectiveness[19][19]={
     {1,1,0.5,0.5,0.5,1,2,1,1,1,1,1,1,2,1,1,1,0.5,2},
     {1,1,0.5,1,1,1,1,2,0.5,1,1,1,1,1,1,2,2,0.5,1}
 };
-
-SDL_Rect dBoxClip = { 10, 515, 812, 179 };
-dialogueBox d_box;
-Text d_text;
-
-Mix_Chunk* changeMap;
-Mix_Chunk* aButton;
-Mix_Chunk* gameSaved;
-Mix_Chunk* startMenuSound;
-Mix_Chunk* deniedSound;
-Mix_Chunk* clickedOnSound;
-
-Map* playerMap;
-Music gameMusic;
-
-mPlayer mainPlayer;
-gameCam mainCamera;
-
-SetupScreen mainSetup;
-BattleScreen mainBattle;
-gameMenu mainMenu;
-
-// GAME STATES
-
-bool tsToMapTransition = false;
-bool beginMapToMapTransition = false;
-bool finishMapToMapTransition = false;
-int transitionTransparency = 0;
-
-bool startTSToSetupTransition = false;
-bool finishTSToSetupTransition = false;
-
-bool beginMapToBattleTransition = false;
-bool finishMapToBattleTransition = false;
-bool beginBattleToMapTransition = false;
-bool finishBattleToMapTransition = false;
-
-bool hasSaveFile = true;
-bool quit = false;
-
-bool inTitleScreen = true; // SET TO FALSE TO SKIP TITLE SCREEN FOR FASTER DEBUG
-bool inSetupScreen = false;
-bool inBattle = false;
-bool inDialogue = false;
-bool inMenu = false;
-
-bool playerIsRunning = false;
-
-Trainer defaultOppo;
