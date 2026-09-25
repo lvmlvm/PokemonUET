@@ -1,6 +1,7 @@
 #include "titleScreen.h"
 #include "RenderWindow.h"
 #include "Variables.h"
+#include "replay.h"
 #include <iostream>
 
 // TITLE SCREEN:
@@ -26,7 +27,9 @@ TitleScreen::TitleScreen() {
     splashScreenTexture = NULL;
     titleScreenBackground = NULL;
     titleScreenLogo = NULL;
+    helpScreenTexture = NULL;
     presentSaveFile = false;
+    inHelpScreen = false;
     acceptInput = false;
 }
 
@@ -35,15 +38,13 @@ TitleScreen::~TitleScreen() {
 }
 
 void TitleScreen::freeTitleScreen() {
-    SDL_DestroyTexture(splashScreenTexture);
-    SDL_DestroyTexture(titleScreenBackground);
-    SDL_DestroyTexture(titleScreenLogo);
-    SDL_DestroyTexture(helpScreenTexture);
-    splashScreenTexture = NULL;
-    titleScreenBackground = NULL;
-    titleScreenLogo = NULL;
-    helpScreenTexture = NULL;
+    SDL_Texture** textures[] = {&splashScreenTexture, &titleScreenBackground, &titleScreenLogo, &helpScreenTexture};
+    for (SDL_Texture** texture : textures) {
+        if (*texture != NULL) SDL_DestroyTexture(*texture);
+        *texture = NULL;
+    }
     logoYCoord = 175;
+    for (int i = 0; i < 4; i++) tsButtons[i].freeButton();
     backButton.freeButton();
 }
 
@@ -68,7 +69,7 @@ void TitleScreen::drawTitleScreen() {
     SDL_RenderCopy(RenderWindow::renderer, splashScreenTexture, NULL, NULL);
 
     // Fades the splash screen away
-    if (splashScreenTransparency == 252) SDL_Delay(3000);
+    if (splashScreenTransparency == 252) replay::delay(3000);
     if (splashScreenTransparency > 0) splashScreenTransparency -= 2;
 
     // Animate the Pokemon VNU logo
@@ -213,15 +214,21 @@ TitleScreenButton::TitleScreenButton() {
     buttonTexture = NULL;
     clickedOn = false;
     currentButtonFrame = 0;
+    buttonDest = {0, 0, 0, 0};
 }
 
 TitleScreenButton::~TitleScreenButton() {
-    SDL_DestroyTexture(buttonTexture);
+    freeButton();
+}
+
+void TitleScreenButton::freeButton() {
+    if (buttonTexture != NULL) SDL_DestroyTexture(buttonTexture);
     clickedOn = false;
     buttonTexture = NULL;
 }
 
 void TitleScreenButton::initTSBTexture(const char* path) {
+    freeButton();
     buttonTexture = IMG_LoadTexture(RenderWindow::renderer, path);
     SDL_SetTextureBlendMode(buttonTexture, SDL_BLENDMODE_BLEND);
     for (int i = 0; i < 3; i++) {
@@ -336,10 +343,18 @@ void SetupScreen::setupScreenInputProcess(SDL_Event* e) {
 
 // SETUP SCREEN BUTTONS
 
-SSButton::SSButton() {}
-SSButton::~SSButton() {}
+SSButton::SSButton() {
+    buttonTexture = NULL;
+    buttonDest = {0, 0, 0, 0};
+    currentButtonFrame = 0;
+}
+
+SSButton::~SSButton() {
+    freeButton();
+}
 
 void SSButton::initSSB(const char* path, int x, int y, int w, int h, int BW, int BH) {
+    freeButton();
     buttonTexture = IMG_LoadTexture(RenderWindow::renderer, path);
     buttonDest = {x, y, w, h};
     for (int i = 0; i < 3; i++) {
@@ -348,8 +363,10 @@ void SSButton::initSSB(const char* path, int x, int y, int w, int h, int BW, int
 }
 
 void SSButton::freeButton() {
-    SDL_DestroyTexture(buttonTexture);
+    if (buttonTexture != NULL) SDL_DestroyTexture(buttonTexture);
     buttonTexture = NULL;
+    clickedOn = false;
+    currentButtonFrame = 0;
 }
 
 void SSButton::drawButton() {

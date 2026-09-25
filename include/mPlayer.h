@@ -66,6 +66,7 @@ class mPlayer {
         int activePokemonCount;
         HighScoreList playerScoreList;
 
+        void freePlayer(); // releases SDL resources; call before SDL shuts down
         bool loadPlayerData();
         bool savePlayerData();
         void resetPlayerData();

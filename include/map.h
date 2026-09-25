@@ -27,6 +27,7 @@ class WarpTile {
 class InterTile {
     private:
         int tileX, tileY;
+        unsigned int dialogueCursor; // 1-based index of the sentence being shown, 0 = not talking
     public:
         std::vector<std::string> dialogueTexts;
         InterTile(int _tileX, int _tileY);

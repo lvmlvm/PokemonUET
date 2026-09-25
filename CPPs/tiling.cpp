@@ -11,6 +11,7 @@ SDL_Rect* Tile::getClip() {
 
 TileSheet::TileSheet() {
     tilesheet = NULL;
+    sheetColumns = sheetRows = 0;
 }
 
 TileSheet::~TileSheet() {
@@ -20,6 +21,11 @@ TileSheet::~TileSheet() {
 void TileSheet::loadTileSheet(const char* path) {
     freeTileSheet();
     SDL_Surface* tempSurface = IMG_Load(path);
+    if (tempSurface == NULL) {
+        std::cerr << "Failed to load tile sheet " << path << ": " << IMG_GetError() << '\n';
+        sheetRows = sheetColumns = 0;
+        return;
+    }
     tilesheet = SDL_CreateTextureFromSurface(RenderWindow::renderer, tempSurface);
     sheetRows = tempSurface->h / 16;
     sheetColumns = tempSurface->w / 16;
@@ -56,6 +62,7 @@ Tile::~Tile() {
 }
 
 void Tile::defineTile(TileSheet* sheet, int index) {
+    if (sheet->getSheetWidth() == 0) return;
     int coordsX = 16 * (index % sheet->getSheetWidth());
     int coordsY = 16 * (index / sheet->getSheetWidth());
     

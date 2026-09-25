@@ -21,6 +21,7 @@ extern SDL_Event e;
 
 extern TitleScreen gameTitleScreen;
 extern SDL_Texture* blackTransitionTexture;
+const int MAP_COUNT = 12;
 extern string gameMaps[];
 extern string gameTileSets[];
 extern string gameThemes[];

@@ -4,6 +4,7 @@
 #include "BattleScreen.h"
 #include "RenderWindow.h"
 #include "Variables.h"
+#include "rng.h"
 
 // BATTLE RENDERING
 
@@ -20,6 +21,25 @@ static int playerBeforeAttackHP = 0, opponentBeforeAttackHP = 0,
 static double pCirX = 0, oCirX = 0, playerPokemonMoveAnim = 0, opponentPokemonMoveAnim = 0, PokemonTransparency = 0;
 
 BattleScreen::BattleScreen() {
+    battlePlayer = NULL;
+    battleOpponent = NULL;
+    currentPlayerPokemon = NULL;
+    currentOpponentPokemon = NULL;
+    battleBackground = battleCircle = grayInputBox = NULL;
+    playerTexture = opponentTexture = NULL;
+    playerHPBar = oppoHPBar = HPColor = NULL;
+    playerPokeTexture = opponentPokeTexture = NULL;
+    effectiveSFX = notEffectiveSFX = superEffectiveSFX = pokemonFainted = NULL;
+}
+
+const std::string& BattleScreen::actionAt(unsigned int i) const {
+    static const std::string none;
+    return i < turnActionQueue.size() ? turnActionQueue[i] : none;
+}
+
+const std::string& BattleScreen::dialogueAt(unsigned int i) const {
+    static const std::string none;
+    return i < battleDialogues.size() ? battleDialogues[i] : none;
 }
 
 BattleScreen::~BattleScreen() {
@@ -109,18 +129,17 @@ void BattleScreen::initBattleScreen(mPlayer* player, Trainer* opponent) {
 }
 
 void BattleScreen::freeBattleScreen() {
-    // MAIN BATTLE TEXTURES
-	SDL_DestroyTexture(battleBackground);
-	SDL_DestroyTexture(battleCircle);
-	SDL_DestroyTexture(grayInputBox);
-    SDL_DestroyTexture(playerTexture);
-    SDL_DestroyTexture(opponentTexture);
+    // ALL TEXTURES
+    SDL_Texture** textures[] = {&battleBackground, &battleCircle, &grayInputBox, &playerTexture, &opponentTexture,
+                                &playerPokeTexture, &opponentPokeTexture, &playerHPBar, &oppoHPBar, &HPColor};
+    for (SDL_Texture** texture : textures) {
+        if (*texture != NULL) SDL_DestroyTexture(*texture);
+        *texture = NULL;
+    }
 
-    battleBackground = NULL;
-	battleCircle = NULL;
-	grayInputBox = NULL;
-    playerTexture = NULL;
-    opponentTexture = NULL;
+    bd_Text.freeText();
+    playerPokeName.freeText();
+    oppoPokeName.freeText();
 
     playerCircle = {832, 450, 320, 100};
 	opponentCircle = {-320, 200, 320, 100};
@@ -129,10 +148,6 @@ void BattleScreen::freeBattleScreen() {
     opponentSpriteBox = {-320, 20, 240, 240};
 
     // ON SCREEN POKEMANS
-    SDL_DestroyTexture(playerPokeTexture);
-    SDL_DestroyTexture(opponentPokeTexture);
-    playerPokeTexture = NULL;
-    opponentPokeTexture = NULL;
     playerPokeRect = {-240, 300, 240, 240};
     oppoPokeRect = {832, 20, 240, 240};
 
@@ -142,30 +157,23 @@ void BattleScreen::freeBattleScreen() {
     currPlayHP = {708, 443, 106, 7};
     currOppoHP = {112, 119, 107, 7};
 
-    SDL_DestroyTexture(playerHPBar);
-    SDL_DestroyTexture(oppoHPBar);
-    SDL_DestroyTexture(HPColor);
-    playerHPBar = NULL;
-    oppoHPBar = NULL;
-    HPColor = NULL;
-
     // Free the buttons
-    fightButton.~BattleScreenButton();
-    pokemonButton.~BattleScreenButton();
-    retireButton.~BattleScreenButton();
+    fightButton.freeButton();
+    pokemonButton.freeButton();
+    retireButton.freeButton();
 
-    for (int i = 0; i < 4; i++) moveButtons[i].~BattleScreenButton();
-    backButton.~BattleScreenButton();
+    for (int i = 0; i < 4; i++) moveButtons[i].freeButton();
+    backButton.freeButton();
 
     selScreen.freeSelectionScreen();
 
     battleDialogues.clear();
     turnActionQueue.clear();
 
-    Mix_FreeChunk(effectiveSFX);
-    Mix_FreeChunk(notEffectiveSFX);
-    Mix_FreeChunk(superEffectiveSFX);
-    Mix_FreeChunk(pokemonFainted);
+    if (effectiveSFX != NULL) Mix_FreeChunk(effectiveSFX);
+    if (notEffectiveSFX != NULL) Mix_FreeChunk(notEffectiveSFX);
+    if (superEffectiveSFX != NULL) Mix_FreeChunk(superEffectiveSFX);
+    if (pokemonFainted != NULL) Mix_FreeChunk(pokemonFainted);
     effectiveSFX=NULL;
     notEffectiveSFX=NULL;
     superEffectiveSFX=NULL;
@@ -231,13 +239,13 @@ void BattleScreen::drawBattleScreen(bool fMtB, bool fBtM) {
 
     // the first battle sentence
     if (fMtB == false and BattleSen == 0 and startingBattle == true) {
-        bd_Text.textInit(RenderWindow::renderer, battleDialogues[BattleSen].c_str(), {255, 255, 255}, 800);
+        bd_Text.textInit(RenderWindow::renderer, dialogueAt(BattleSen).c_str(), {255, 255, 255}, 800);
         bd_Text.display(32, 530, RenderWindow::renderer);
     }
 
     // opponent sending out the pokemons
     if (BattleSen == 1 and startingBattle == true) {
-        bd_Text.textInit(RenderWindow::renderer, battleDialogues[BattleSen].c_str(), {255, 255, 255}, 800);
+        bd_Text.textInit(RenderWindow::renderer, dialogueAt(BattleSen).c_str(), {255, 255, 255}, 800);
         bd_Text.display(32, 530, RenderWindow::renderer);
         if (opponentSpriteBox.x < 860) {
             opponentSpriteBox.x += 8;
@@ -256,7 +264,7 @@ void BattleScreen::drawBattleScreen(bool fMtB, bool fBtM) {
 
     // player sending out the pokemons
     if (BattleSen == 2 and startingBattle == true) {
-        bd_Text.textInit(RenderWindow::renderer, battleDialogues[BattleSen].c_str(), {255, 255, 255}, 800);
+        bd_Text.textInit(RenderWindow::renderer, dialogueAt(BattleSen).c_str(), {255, 255, 255}, 800);
         bd_Text.display(32, 530, RenderWindow::renderer);
         if (playerSpriteBox.x > -240) {
             playerSpriteBox.x -= 8;
@@ -308,10 +316,10 @@ void BattleScreen::drawBattleScreen(bool fMtB, bool fBtM) {
 
     // HANDLING MOVE ANIMATION AND FLAGS AND BATTLE DIALOGUES 
     if (startingBattle == false and fightScreen == false and moveScreen == false) {
-        bd_Text.textInit(RenderWindow::renderer, battleDialogues[BattleSen].c_str(), {255, 255, 255}, 800);
+        bd_Text.textInit(RenderWindow::renderer, dialogueAt(BattleSen).c_str(), {255, 255, 255}, 800);
         bd_Text.display(32, 530, RenderWindow::renderer);
 
-        if (turnActionQueue[BattleSen] == "PLAYER_USE_MOVE") // ANIMATE THE PLAYER USING A MOVE
+        if (actionAt(BattleSen) == "PLAYER_USE_MOVE") // ANIMATE THE PLAYER USING A MOVE
         {
             if (playerPokemonMoveAnim < 21 and inAnim0 == true) {
                 playerPokeRect.x = -(playerPokemonMoveAnim*playerPokemonMoveAnim) + 20*playerPokemonMoveAnim + 90;
@@ -319,13 +327,13 @@ void BattleScreen::drawBattleScreen(bool fMtB, bool fBtM) {
             } else if (playerPokemonMoveAnim == 21 and inAnim0 == true) {
                 if (PokemonTransparency == 0) {
                     if (BattleSen + 1 < turnActionQueue.size()) {
-                        if (turnActionQueue[BattleSen+1] == "MOVE_NOEFFECT") {
+                        if (actionAt(BattleSen+1) == "MOVE_NOEFFECT") {
                             playerPokemonMoveAnim = 0;
                             PokemonTransparency = 0;
                             inAnim0 = false;
-                        } else if (turnActionQueue[BattleSen+1] == "MOVE_NOT_EFFECTIVE") {
+                        } else if (actionAt(BattleSen+1) == "MOVE_NOT_EFFECTIVE") {
                             Mix_PlayChannel(-1, notEffectiveSFX, 0);
-                        } else if (turnActionQueue[BattleSen+1] == "MOVE_SUPER_EFFECTIVE") {
+                        } else if (actionAt(BattleSen+1) == "MOVE_SUPER_EFFECTIVE") {
                             Mix_PlayChannel(-1, superEffectiveSFX, 0);
                         } else Mix_PlayChannel(-1, effectiveSFX, 0);
                     } else Mix_PlayChannel(-1, effectiveSFX, 0);
@@ -345,7 +353,7 @@ void BattleScreen::drawBattleScreen(bool fMtB, bool fBtM) {
         }
 
         // ANIMATE THE OPPONENT USING A MOVE, HANDLING THE BATTLE SCRIPTS
-        else if (turnActionQueue[BattleSen] == "OPPONENT_USE_MOVE") 
+        else if (actionAt(BattleSen) == "OPPONENT_USE_MOVE") 
         {
             if (opponentPokemonMoveAnim < 21 and inAnim0 == true) {
                 oppoPokeRect.x = (opponentPokemonMoveAnim*opponentPokemonMoveAnim) - 20*opponentPokemonMoveAnim + 500;
@@ -353,13 +361,13 @@ void BattleScreen::drawBattleScreen(bool fMtB, bool fBtM) {
             } else if (opponentPokemonMoveAnim == 21 and inAnim0 == true) {
                 if (PokemonTransparency == 0) {
                     if (BattleSen + 1 < turnActionQueue.size()) {
-                        if (turnActionQueue[BattleSen+1] == "MOVE_NOEFFECT") {
+                        if (actionAt(BattleSen+1) == "MOVE_NOEFFECT") {
                             opponentPokemonMoveAnim = 0;
                             PokemonTransparency = 0;
                             inAnim0 = false;
-                        } else if (turnActionQueue[BattleSen+1] == "MOVE_NOT_EFFECTIVE") {
+                        } else if (actionAt(BattleSen+1) == "MOVE_NOT_EFFECTIVE") {
                             Mix_PlayChannel(-1, notEffectiveSFX, 0);
-                        } else if (turnActionQueue[BattleSen+1] == "MOVE_SUPER_EFFECTIVE") {
+                        } else if (actionAt(BattleSen+1) == "MOVE_SUPER_EFFECTIVE") {
                             Mix_PlayChannel(-1, superEffectiveSFX, 0);
                         } else Mix_PlayChannel(-1, effectiveSFX, 0);
                     } else Mix_PlayChannel(-1, effectiveSFX, 0);
@@ -378,7 +386,7 @@ void BattleScreen::drawBattleScreen(bool fMtB, bool fBtM) {
             }
         }
 
-        else if (turnActionQueue[BattleSen] == "OPPONENT_FAINT") 
+        else if (actionAt(BattleSen) == "OPPONENT_FAINT") 
         {
             if ((halfOppoPokeRect.h > 0 or oppoPokeRect.y < 260) and inAnim0 == true) {
                 halfOppoPokeRect.h -= 10;
@@ -393,7 +401,7 @@ void BattleScreen::drawBattleScreen(bool fMtB, bool fBtM) {
             }
         }
 
-        else if (turnActionQueue[BattleSen] == "OPPONENT_NEXT_POKEMON") {
+        else if (actionAt(BattleSen) == "OPPONENT_NEXT_POKEMON") {
             if (oppoPokeRect.x > 500) {
                 if (oppoPokeRect.x == 832) {
                     SDL_DestroyTexture(opponentPokeTexture);
@@ -410,7 +418,7 @@ void BattleScreen::drawBattleScreen(bool fMtB, bool fBtM) {
             }
         }
 
-        else if (turnActionQueue[BattleSen] == "PLAYER_FAINT") 
+        else if (actionAt(BattleSen) == "PLAYER_FAINT") 
         {
             if ((halfPlayerPokeRect.h > 0 or playerPokeRect.y < 540) and inAnim0 == true) {
                 halfPlayerPokeRect.h -= 10;
@@ -425,27 +433,27 @@ void BattleScreen::drawBattleScreen(bool fMtB, bool fBtM) {
             }
         }
 
-        else if (turnActionQueue[BattleSen] == "FORCE_OPEN_PARTY")
+        else if (actionAt(BattleSen) == "FORCE_OPEN_PARTY")
         {
             inSelectionScreen = true;
             selScreen.updateSelectionScreen(battlePlayer);
             inAnim0 = false;
         }
 
-        else if (turnActionQueue[BattleSen] == "PLAYER_NEXT_POKEMON")
+        else if (actionAt(BattleSen) == "PLAYER_NEXT_POKEMON")
         {
             if (playerPokeRect.x < 90) {
                 playerPokeRect.x += 8;
                 if (playerPokeRect.x > 80) {
                     inAnim0 = false;
-                    if (turnActionQueue[BattleSen-1] == "PLAYER_WITHDREW_POKEMON") currPlayHP = {708, 443, int(ceil(106.0*(double(playerBeforeAttackHP)/double(currentPlayerPokemon->data->hp)))), 7};
+                    if (actionAt(BattleSen-1) == "PLAYER_WITHDREW_POKEMON") currPlayHP = {708, 443, int(ceil(106.0*(double(playerBeforeAttackHP)/double(currentPlayerPokemon->data->hp)))), 7};
                     else currPlayHP = {708, 443, int(ceil(106.0*(double(currentPlayerPokemon->c_hp)/double(currentPlayerPokemon->data->hp)))), 7};
                     showPHPBar = true;
                 }
             }
         }
 
-        else if (turnActionQueue[BattleSen] == "PLAYER_WITHDREW_POKEMON")
+        else if (actionAt(BattleSen) == "PLAYER_WITHDREW_POKEMON")
         {
             if (playerPokeRect.x > -240) {
                 playerPokeRect.x -= 8;
@@ -458,7 +466,7 @@ void BattleScreen::drawBattleScreen(bool fMtB, bool fBtM) {
             }
         }
 
-        else if (turnActionQueue[BattleSen] == "PLAYER_DEFEATED")
+        else if (actionAt(BattleSen) == "PLAYER_DEFEATED")
         {
             battlePlayer->playerScoreList.updateHighScoreList(battlePlayer->getCurrentHighScore());
             battlePlayer->resetCurrentHighScore();
@@ -470,7 +478,7 @@ void BattleScreen::drawBattleScreen(bool fMtB, bool fBtM) {
             inAnim0 = false;
         }
 
-        else if (turnActionQueue[BattleSen] == "END_BATTLE")
+        else if (actionAt(BattleSen) == "END_BATTLE")
         {
             beginBattleToMapTransition = true;
         }
@@ -520,7 +528,7 @@ void BattleScreen::centralBattleProcess(SDL_Event* e) {
     // IN THE POKEMON SELECTION SCREEN
     if (inSelectionScreen == true) {
         // EXIT THE MENU WITH ESCAPE KEY
-        if (e->type == SDL_KEYDOWN && e->key.keysym.sym == SDLK_ESCAPE && turnActionQueue[BattleSen] != "FORCE_OPEN_PARTY") {
+        if (e->type == SDL_KEYDOWN && e->key.keysym.sym == SDLK_ESCAPE && actionAt(BattleSen) != "FORCE_OPEN_PARTY") {
             inSelectionScreen = false;
             pokemonButton.buttonHandler();
             return;
@@ -528,7 +536,7 @@ void BattleScreen::centralBattleProcess(SDL_Event* e) {
 
         // EXIT THE MENU WITH BACK BUTTON
         selScreen.backButton.buttonHandler();
-        if (selScreen.backButton.clickedOn == true && turnActionQueue[BattleSen] != "FORCE_OPEN_PARTY") {
+        if (selScreen.backButton.clickedOn == true && actionAt(BattleSen) != "FORCE_OPEN_PARTY") {
             selScreen.backButton.clickedOn = false;
             inSelectionScreen = false;
             return;
@@ -605,7 +613,6 @@ void BattleScreen::centralBattleProcess(SDL_Event* e) {
 }
 
 void BattleScreen::localTurnHandler(int move) {
-    srand(time(NULL));
     bool isKO;
     if (currentPlayerPokemon->data->speed >= currentOpponentPokemon->data->speed) { // IF THE PLAYER IS FASTER OR HAS SAME SPEED AS OPPONENT
         isKO = useMove(move, *currentPlayerPokemon, *currentOpponentPokemon, false);
@@ -751,12 +758,19 @@ BattleScreenButton::BattleScreenButton() {
 }
 
 BattleScreenButton::~BattleScreenButton() {
-    SDL_DestroyTexture(buttonTexture);
+    freeButton();
+}
+
+void BattleScreenButton::freeButton() {
+    if (buttonTexture != NULL) SDL_DestroyTexture(buttonTexture);
     buttonTexture = NULL;
     clickedOn = false;
+    currentButtonFrame = 0;
+    moveNames.freeText();
 }
 
 void BattleScreenButton::initBSB(const char* path, int x, int y, int BW, int BH, int imgWidth, int imgHeight, bool isMoveButton) {
+    freeButton();
     buttonTexture = IMG_LoadTexture(RenderWindow::renderer, path);
     for (int i = 0; i < 3; i++) {
         buttonFrames[i] = {0, imgHeight*i, imgWidth, imgHeight};
@@ -833,6 +847,11 @@ void BattleScreenButton::moveButtonHandler(int buttonNum) {
 // POKEMON SELECTION SCREEN
 
 PokemonSelectionScreen::PokemonSelectionScreen() {
+    pokePartyScreenText = NULL;
+    canBattleTexture = NULL;
+    cannotBattleTexture = NULL;
+    HPBarTexture = NULL;
+    hpColor = NULL;
 }
 
 PokemonSelectionScreen::~PokemonSelectionScreen() {
@@ -878,20 +897,18 @@ void PokemonSelectionScreen::initSelectionScreen(mPlayer* player) {
 }
 
 void PokemonSelectionScreen::freeSelectionScreen() {
-    SDL_DestroyTexture(pokePartyScreenText);
-    SDL_DestroyTexture(canBattleTexture);
-    SDL_DestroyTexture(cannotBattleTexture);
-    SDL_DestroyTexture(HPBarTexture);
-    SDL_DestroyTexture(hpColor);
-    pokePartyScreenText = NULL;
-    canBattleTexture = NULL;
-    cannotBattleTexture = NULL;
-    HPBarTexture = NULL;
-    hpColor = NULL;
-    pokeNames[0].~Text();
-    pokeNames[1].~Text();
-    pokeNames[2].~Text();
-    backButton.~BattleScreenButton();
+    SDL_Texture** textures[] = {&pokePartyScreenText, &canBattleTexture, &cannotBattleTexture, &HPBarTexture, &hpColor};
+    for (SDL_Texture** texture : textures) {
+        if (*texture != NULL) SDL_DestroyTexture(*texture);
+        *texture = NULL;
+    }
+    whichPoke.freeText();
+    for (int i = 0; i < 3; i++) {
+        pokeNames[i].freeText();
+        pokeTextHPs[i].freeText();
+        pokemonSelectionButton[i].freeButton();
+    }
+    backButton.freeButton();
 }
 
 void PokemonSelectionScreen::updateSelectionScreen(mPlayer* player) {

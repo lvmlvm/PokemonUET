@@ -21,6 +21,7 @@ class BattleScreenButton {
 		BattleScreenButton();
 		~BattleScreenButton();
 		void initBSB(const char* path, int x, int y, int BH, int BW, int imgWidth, int imgHeight, bool isMoveButton = false);
+		void freeButton();
 		void drawButton(bool isMoveButton = false);
         void buttonHandler();
 		void moveButtonHandler(int buttonNum);
@@ -118,6 +119,9 @@ class BattleScreen {
 		void printText(string s);
 		void oSentPkm(Pokemon &my,Pokemon &op);
 		void pSentPkm(Pokemon &my,Pokemon &op);
+
+		const std::string& actionAt(unsigned int i) const;   // "" when out of range
+		const std::string& dialogueAt(unsigned int i) const; // "" when out of range
 
 		void localTurnHandler(int move); // HANDLES TURN OF ATTACKING BETWEEN POKEMONS
 		void localSwitchPokemonHandler(int selPoke); // HANDLES THE ACT OF PLAYER SWITCHING BETWEEN POKEMONS MID-BATTLE

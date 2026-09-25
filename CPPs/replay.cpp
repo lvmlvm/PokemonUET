@@ -21,6 +21,8 @@ struct Command {
 
 std::vector<Command> commands;
 size_t next = 0;
+Uint32 frame = 0;
+const Uint32 WATCHDOG_FRAMES = 600;
 
 void pushKey(Uint32 type, const std::string& name) {
     SDL_Event ev{};
@@ -86,7 +88,7 @@ void replay::load() {
 
         if (cmd.op == "tap") {
             commands.push_back({cmd.at, "down", cmd.arg});
-            commands.push_back({cmd.at + 80, "up", cmd.arg});
+            commands.push_back({cmd.at + 5, "up", cmd.arg});
         } else {
             commands.push_back(cmd);
         }
@@ -95,11 +97,20 @@ void replay::load() {
     std::cerr << "replay: loaded " << commands.size() << " commands from " << path << '\n';
 }
 
+void replay::delay(Uint32 ms) {
+    static const double speed = [] {
+        const char* value = std::getenv("POKEMON_REPLAY_SPEED");
+        return value != nullptr ? std::atof(value) : 1.0;
+    }();
+    if (speed <= 0.0) return;
+    SDL_Delay(static_cast<Uint32>(ms / speed));
+}
+
 void replay::beforePresent() {
-    const Uint32 now = SDL_GetTicks();
+    const Uint32 now = frame++;
     while (next < commands.size() && commands[next].at <= now) {
         const Command& cmd = commands[next++];
-        std::cerr << "replay: " << now << "ms " << cmd.op << ' ' << cmd.arg << '\n';
+        std::cerr << "replay: frame " << now << ' ' << cmd.op << ' ' << cmd.arg << '\n';
         if (cmd.op == "down") pushKey(SDL_KEYDOWN, cmd.arg);
         else if (cmd.op == "up") pushKey(SDL_KEYUP, cmd.arg);
         else if (cmd.op == "click") pushClick(cmd.x, cmd.y);
@@ -108,6 +119,19 @@ void replay::beforePresent() {
             SDL_Event ev{};
             ev.type = SDL_QUIT;
             SDL_PushEvent(&ev);
+        }
+    }
+
+    if (!commands.empty() && next == commands.size()) {
+        const Uint32 last = commands.back().at;
+        if (now == last + WATCHDOG_FRAMES) {
+            std::cerr << "replay: watchdog: script finished " << WATCHDOG_FRAMES << " frames ago, sending quit\n";
+            SDL_Event ev{};
+            ev.type = SDL_QUIT;
+            SDL_PushEvent(&ev);
+        } else if (now >= last + 2 * WATCHDOG_FRAMES) {
+            std::cerr << "replay: watchdog: game ignored quit, aborting\n";
+            std::_Exit(3);
         }
     }
 }

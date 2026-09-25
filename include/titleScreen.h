@@ -15,6 +15,7 @@ class TitleScreenButton {
         TitleScreenButton();
         ~TitleScreenButton();
         void initTSBTexture(const char* path); // Initialize the buttons
+        void freeButton();
         void setButtonDest(int x, int y);
         SDL_Rect* getButtonFrame();
         void drawButton();

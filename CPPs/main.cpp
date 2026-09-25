@@ -1,5 +1,6 @@
 #include "Variables.h"
 #include "replay.h"
+#include "rng.h"
 
 // CORE GAME FUNCTIONS
 
@@ -71,29 +72,32 @@ bool initSystem() {
     return true;
 }
 
+// Releases every SDL resource held by the global game objects. Must run before
+// renderWindow.close() shuts SDL down; the globals' destructors run after that and
+// only see already-released (NULL) handles.
 void freeMainAssets() {
+    gameTitleScreen.freeTitleScreen();
     mainMenu.freeMenu();
     mainSetup.freeSetupScreen();
-    playerMap->freeOverlayElements();
-    playerMap->freeMap();
+    mainBattle.freeBattleScreen();
+    mainPlayer.freePlayer();
+    if (playerMap != NULL) {
+        playerMap->freeOverlayElements();
+        delete playerMap;
+        playerMap = NULL;
+    }
 
-    SDL_DestroyTexture(blackTransitionTexture);
+    if (blackTransitionTexture != NULL) SDL_DestroyTexture(blackTransitionTexture);
     blackTransitionTexture = NULL;
 
+    Mix_HaltMusic();
     gameMusic.freeMusic();
 
-    Mix_FreeChunk(changeMap);
-    Mix_FreeChunk(aButton);
-    Mix_FreeChunk(gameSaved);
-    Mix_FreeChunk(startMenuSound);
-    Mix_FreeChunk(deniedSound);
-    Mix_FreeChunk(clickedOnSound);
-    changeMap = NULL;
-    aButton = NULL;
-    gameSaved = NULL;
-    startMenuSound = NULL;
-    deniedSound = NULL;
-    clickedOnSound = NULL;
+    Mix_Chunk** chunks[] = {&changeMap, &aButton, &gameSaved, &startMenuSound, &deniedSound, &clickedOnSound};
+    for (Mix_Chunk** chunk : chunks) {
+        if (*chunk != NULL) Mix_FreeChunk(*chunk);
+        *chunk = NULL;
+    }
 
     d_box.freeDialogueBox();
     d_text.freeText();
@@ -156,7 +160,7 @@ void overworldInputProcess(SDL_Event* e, int pCX, int pCY) {
             if (selWarpTile != NULL and (e->key.keysym.sym == SDLK_w or e->key.keysym.sym == SDLK_a or e->key.keysym.sym == SDLK_s or e->key.keysym.sym == SDLK_d)) {
                 beginMapToMapTransition = true;
             } else {
-                mainCamera.beginMovement(e, pCX, pCY, playerMap->getCollisionMap());
+                mainCamera.beginMovement(e, pCX, pCY, playerMap->getCollisionMap(), playerMap->getMapWidth(), playerMap->getMapHeight());
             }
         } 
 
@@ -222,6 +226,7 @@ void titleScreenInputProcess(SDL_Event* e) // ALREADY MOSTLY FINISHED. DO NOT TO
 }
 
 void gameLoop() {
+    bool transitionMusicLoaded = false;
     while (quit == false) {
         if (inTitleScreen == true) // PLAYER IN THE TITLE SCREEN. AGAIN, MOSTLY FINISHED, DO NOT TOUCH
         {
@@ -238,7 +243,7 @@ void gameLoop() {
                 } else if (transitionTransparency >= 255) {
                     inTitleScreen = false;
                     gameTitleScreen.freeTitleScreen();
-                    SDL_Delay(1000);
+                    replay::delay(1000);
                 }
                 SDL_SetTextureAlphaMod(blackTransitionTexture, transitionTransparency);
                 SDL_RenderCopy(RenderWindow::renderer, blackTransitionTexture, NULL, NULL);
@@ -253,7 +258,7 @@ void gameLoop() {
                     startTSToSetupTransition = false;
                     finishTSToSetupTransition = true;
                     gameTitleScreen.freeTitleScreen();
-                    SDL_Delay(500);
+                    replay::delay(500);
                 }
                 SDL_SetTextureAlphaMod(blackTransitionTexture, transitionTransparency);
                 SDL_RenderCopy(RenderWindow::renderer, blackTransitionTexture, NULL, NULL);
@@ -261,7 +266,7 @@ void gameLoop() {
 
             renderWindow.display();
 
-            SDL_Delay(1000/60);
+            replay::delay(1000/60);
         }
 
         else if (inSetupScreen == true)
@@ -289,7 +294,7 @@ void gameLoop() {
                     transitionTransparency += 17;
                 } else if (transitionTransparency >= 255) {
                     inSetupScreen = false;
-                    SDL_Delay(1000);
+                    replay::delay(1000);
                 }
                 SDL_SetTextureAlphaMod(blackTransitionTexture, transitionTransparency);
                 SDL_RenderCopy(RenderWindow::renderer, blackTransitionTexture, NULL, NULL);
@@ -297,7 +302,7 @@ void gameLoop() {
 
             renderWindow.display();
 
-            SDL_Delay(1000 / 60);
+            replay::delay(1000 / 60);
         }
         
         else if (inBattle == true) // PLAYER IN BATTLE
@@ -337,7 +342,7 @@ void gameLoop() {
 
             renderWindow.display();
 
-            SDL_Delay(1000 / 60);
+            replay::delay(1000 / 60);
         }
 
         else // PLAYER IN THE MAP
@@ -357,7 +362,7 @@ void gameLoop() {
             } 
             else 
             {
-                mainCamera.moveCamera(pCX, pCY, playerMap->getCollisionMap());
+                mainCamera.moveCamera(pCX, pCY, playerMap->getCollisionMap(), playerMap->getMapWidth(), playerMap->getMapHeight());
                 mainCamera.finishIllegalPos(playerMap->getMapWidth(), playerMap->getMapHeight());
             }
 
@@ -400,10 +405,9 @@ void gameLoop() {
                         d_text.display(48, 547, RenderWindow::renderer);
                         if (selInterTile->getX() == 13 && selInterTile->getY() == 16 && mainPlayer.getCurrentMap() == 4) { // SPECIAL TILE FOR GENERATING NEW POKEMONS UPON TALKING TO
                             if (selInterTile->getInterCurrentSentenceID() == 2) {
-                                srand(time(NULL));
-                                mainPlayer.party[0] = rand() % 36 + 1;
-                                mainPlayer.party[1] = rand() % 36 + 1;
-                                mainPlayer.party[2] = rand() % 36 + 1;
+                                mainPlayer.party[0] = randomInt(1, psize - 1);
+                                mainPlayer.party[1] = randomInt(1, psize - 1);
+                                mainPlayer.party[2] = randomInt(1, psize - 1);
                             } else if (selInterTile->getInterCurrentSentenceID() == 1 and selInterTile->getInterDialogueSize() > 3) {
                                 selInterTile->dialogueTexts.pop_back();
                             } else if (selInterTile->getInterCurrentSentenceID() == 3 and selInterTile->getInterDialogueSize() < 4) {
@@ -437,6 +441,10 @@ void gameLoop() {
                     if (transitionTransparency == 51) Mix_PlayChannel(-1, changeMap, 0);
                 } else if (transitionTransparency >= 255) {
                     WarpTile* selWarpTile = playerMap->getNearbyWarpTile(pCX, pCY, mainPlayer.getFacingDirection());
+                    if (selWarpTile == NULL) { // should not happen: the transition only starts while facing a warp tile
+                        beginMapToMapTransition = false;
+                        finishMapToMapTransition = true;
+                    } else {
                     int tdM = selWarpTile->getDestMap(), tdX = selWarpTile->getDestX(), tdY = selWarpTile->getDestY();
                     beginMapToMapTransition = false;
                     finishMapToMapTransition = true;
@@ -450,6 +458,7 @@ void gameLoop() {
                     playerMap->loadMap(gameMaps[tdM].c_str(), gameTileSets[tdM].c_str(), gameThemes[tdM].c_str(), themeRepeats[tdM], mapOverlays[tdM]);
                     mainPlayer.setPlayerCoords(tdX, tdY, tdM);
                     mainCamera.setCameraPos((mainPlayer.getXCoords() - 6) * 64, (mainPlayer.getYCoords() - 5) * 64);
+                    }
                 }
                 SDL_SetTextureAlphaMod(blackTransitionTexture, transitionTransparency);
                 SDL_RenderCopy(RenderWindow::renderer, blackTransitionTexture, NULL, NULL);
@@ -469,24 +478,30 @@ void gameLoop() {
 
             // MAP TO BATTLE TRANSITION HANDLING
             if (beginMapToBattleTransition == true) {
-                gameMusic.freeMusic();
-                gameMusic.resetChord();
-                gameMusic.loadMusic("res/music/battleMusic.mp3", 19.9);
+                if (transitionMusicLoaded == false) { // load once, at the start of the transition
+                    gameMusic.freeMusic();
+                    gameMusic.resetChord();
+                    gameMusic.loadMusic("res/music/battleMusic.mp3", 19.9);
+                    transitionMusicLoaded = true;
+                }
                 if (transitionTransparency < 255) {
                     transitionTransparency += 5;
                 } else if (transitionTransparency >= 255) {
-                    if (mainPlayer.getCurrentMap() >= 5 and mainPlayer.getCurrentMap() <= 11) playerMap->popLastNPC();
-
-                    srand(time(NULL));
-
+                    transitionMusicLoaded = false;
                     NPC* selNPC = playerMap->getNearbyNPC(pCX, pCY, mainPlayer.getFacingDirection());
+                    if (selNPC == NULL) { // should not happen: the battle only starts while facing its trainer
+                        beginMapToBattleTransition = false;
+                        tsToMapTransition = true; // fade back in
+                    } else {
+                    // Look up the trainer before removing the challenge room's gate NPC (always the last one).
+                    if (mainPlayer.getCurrentMap() >= 5 and mainPlayer.getCurrentMap() <= 11) playerMap->popLastNPC();
 
                     defaultOppo.name = selNPC->getTrainerName();
                     defaultOppo.battleSpritePath = selNPC->getTrainerSprite();
 
-                    defaultOppo.party[0] = rand() % 36 + 1;
-                    defaultOppo.party[1] = rand() % 36 + 1;
-                    defaultOppo.party[2] = rand() % 36 + 1;
+                    defaultOppo.party[0] = randomInt(1, psize - 1);
+                    defaultOppo.party[1] = randomInt(1, psize - 1);
+                    defaultOppo.party[2] = randomInt(1, psize - 1);
 
                     transitionTransparency = 255;
                     inBattle = true;
@@ -495,6 +510,7 @@ void gameLoop() {
                     mainBattle.initBattleScreen(&mainPlayer, &defaultOppo);
                     
                     selNPC->changeBattleStatus(1);
+                    }
                 }
                 SDL_SetTextureAlphaMod(blackTransitionTexture, transitionTransparency);
                 SDL_RenderCopy(RenderWindow::renderer, blackTransitionTexture, NULL, NULL);
@@ -502,13 +518,17 @@ void gameLoop() {
 
             // FINISHING BATTLE TRANSITION HANDLING
             if (finishBattleToMapTransition == true) {
-                gameMusic.freeMusic();
-                gameMusic.resetChord();
-                gameMusic.loadMusic(gameThemes[mainPlayer.getCurrentMap()].c_str(), themeRepeats[mainPlayer.getCurrentMap()]);
+                if (transitionMusicLoaded == false) { // load once, at the start of the transition
+                    gameMusic.freeMusic();
+                    gameMusic.resetChord();
+                    gameMusic.loadMusic(gameThemes[mainPlayer.getCurrentMap()].c_str(), themeRepeats[mainPlayer.getCurrentMap()]);
+                    transitionMusicLoaded = true;
+                }
 
                 if (transitionTransparency > 0) {
                     transitionTransparency -= 5;
                 } else if (transitionTransparency <= 0) {
+                    transitionMusicLoaded = false;
                     transitionTransparency = 0;
                     finishBattleToMapTransition = false;
                     mainBattle.freeBattleScreen();
@@ -522,7 +542,7 @@ void gameLoop() {
             
             renderWindow.display(); // DISPLAY THE CONTENT TO THE WINDOW
 
-            SDL_Delay(1000 / 60); // PRIMITIVE CAP FRAME RATE
+            replay::delay(1000 / 60); // PRIMITIVE CAP FRAME RATE
         }
     }
 }

@@ -12,16 +12,20 @@
 // TEXT
 
 void Text::textInit(SDL_Renderer* renderer, const char* message, const SDL_Color& color, int rightEdge) {
-	SDL_DestroyTexture(TextTexture);
+	if (TextTexture != NULL) SDL_DestroyTexture(TextTexture);
 	TextTexture = NULL;
+	if (textFont == NULL) return;
 	SDL_Surface* textSurface = TTF_RenderText_Blended_Wrapped(textFont, message, color, 753);
+	if (textSurface == NULL) return;
 	TextTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
 	SDL_FreeSurface(textSurface);
 	SDL_QueryTexture(TextTexture, nullptr, nullptr, &TextRect.w, &TextRect.h);
 };
 
 Text::Text() {
+	textFont = NULL;
 	TextTexture = NULL;
+	TextRect = {0, 0, 0, 0};
 }
 
 Text::~Text() {
@@ -29,14 +33,16 @@ Text::~Text() {
 }
 
 void Text::freeText() {
-        TTF_CloseFont(textFont);
-	    textFont=NULL;
-        SDL_DestroyTexture(TextTexture);
-	    TextTexture = NULL;
+	if (textFont != NULL) TTF_CloseFont(textFont);
+	textFont = NULL;
+	if (TextTexture != NULL) SDL_DestroyTexture(TextTexture);
+	TextTexture = NULL;
 }
 
 void Text::createFont(const char* fontPath, int fontSize) {
+	freeText();
 	textFont = TTF_OpenFont(fontPath, fontSize);
+	if (textFont == NULL) std::cerr << "Failed to load font " << fontPath << ": " << TTF_GetError() << '\n';
 }
 
 void Text::display(int x, int y, SDL_Renderer* renderer) {
@@ -63,10 +69,10 @@ void dialogueBox::freeDialogueBox() {
 }
 
 void dialogueBox::initDialogueBox(SDL_Renderer* renderer, const char* path) {
-	SDL_Surface* dialogueBoxSurface = IMG_Load(path);
-	dialogueBoxTexture = SDL_CreateTextureFromSurface(renderer, dialogueBoxSurface);
+	freeDialogueBox();
+	dialogueBoxTexture = IMG_LoadTexture(renderer, path);
 	if (!dialogueBoxTexture) {
-		std::cout << "Error" << endl;
+		std::cerr << "Failed to load " << path << ": " << IMG_GetError() << '\n';
 	}
 }
 
@@ -77,15 +83,21 @@ void dialogueBox::renderDialogueBox(SDL_Renderer* renderer, SDL_Rect* clip) {
 MenuButton::MenuButton() {
     buttonTexture = NULL;
     clickedOn = false;
+    buttonDest = {0, 0, 0, 0};
 }
 
 MenuButton::~MenuButton() {
-	SDL_DestroyTexture(buttonTexture);
+    freeButton();
+}
+
+void MenuButton::freeButton() {
+    if (buttonTexture != NULL) SDL_DestroyTexture(buttonTexture);
     buttonTexture = NULL;
     clickedOn = false;
 }
 
 void MenuButton::initMB(const char* path, int x, int y) {
+    freeButton();
     buttonTexture = IMG_LoadTexture(RenderWindow::renderer, path);
     buttonDest.x = x;
 	buttonDest.y = y;
@@ -115,6 +127,10 @@ void MenuButton::buttonHandler() {
 // GAME MENU
 
 gameMenu::gameMenu() {
+    menuTexture = NULL;
+    menuDest = {0, 0, 0, 0};
+    inPokemonView = false;
+    inHighScoreView = false;
 }
 
 gameMenu::~gameMenu() {
@@ -139,13 +155,13 @@ void gameMenu::initMenu() {
 }
 
 void gameMenu::freeMenu() {
-	SDL_DestroyTexture(menuTexture);
+	if (menuTexture != NULL) SDL_DestroyTexture(menuTexture);
 	menuTexture = NULL;
 
     menuSelScreen.freeMenuSelectionScreen();
     highScore.freeText();
 
-	for (int i = 0; i < 4; i++) buttons[i].~MenuButton();
+	for (int i = 0; i < 4; i++) buttons[i].freeButton();
 }
 
 void gameMenu::centralMenuInputProcess() {
@@ -233,6 +249,11 @@ void gameMenu::drawMenu() {
 // POKEMON SELECTION SCREEN (MENU'S VERSION)
 
 MenuPokemonSelectionScreen::MenuPokemonSelectionScreen() {
+    pokePartyScreenText = NULL;
+    canBattleTexture = NULL;
+    cannotBattleTexture = NULL;
+    HPBarTexture = NULL;
+    hpColor = NULL;
 }
 
 MenuPokemonSelectionScreen::~MenuPokemonSelectionScreen() {
@@ -272,32 +293,27 @@ void MenuPokemonSelectionScreen::initMenuSelectionScreen() {
 }
 
 void MenuPokemonSelectionScreen::freeMenuSelectionScreen() {
-    SDL_DestroyTexture(pokePartyScreenText);
-    SDL_DestroyTexture(canBattleTexture);
-    SDL_DestroyTexture(cannotBattleTexture);
-    SDL_DestroyTexture(HPBarTexture);
-    SDL_DestroyTexture(hpColor);
-    pokePartyScreenText = NULL;
-    canBattleTexture = NULL;
-    cannotBattleTexture = NULL;
-    HPBarTexture = NULL;
-    hpColor = NULL;
+    SDL_Texture** textures[] = {&pokePartyScreenText, &canBattleTexture, &cannotBattleTexture, &HPBarTexture, &hpColor};
+    for (SDL_Texture** texture : textures) {
+        if (*texture != NULL) SDL_DestroyTexture(*texture);
+        *texture = NULL;
+    }
 
-    for (int i = 0; i < 3; i++) pokeNames[i].freeText();
-    backButton.~MenuButton();
+    for (int i = 0; i < 3; i++) {
+        pokeNames[i].freeText();
+        pokeTextHPs[i].freeText();
+    }
+    backButton.freeButton();
 }
 
 void MenuPokemonSelectionScreen::updateMenuSelectionScreen() {
-    hpColor = IMG_LoadTexture(RenderWindow::renderer, "res/battleassets/HPColor.png");
     pokemonHP[0] = {541, 284, int(ceil(121.0*(double(mainPlayer.party[0].c_hp)/double(mainPlayer.party[0].data->hp)))), 8};
     pokemonHP[1] = {541, 362, int(ceil(121.0*(double(mainPlayer.party[1].c_hp)/double(mainPlayer.party[1].data->hp)))), 8};
     pokemonHP[2] = {541, 440, int(ceil(121.0*(double(mainPlayer.party[2].c_hp)/double(mainPlayer.party[2].data->hp)))), 8};
 
     for (int i = 0; i < 3; i++) {
-        pokeNames[i].createFont("res/font/gamefont.ttf", 42);
         pokeNames[i].textInit(RenderWindow::renderer, (mainPlayer.party[i].data->name).c_str(), {0, 0, 0}, 710);
 
-        pokeTextHPs[i].createFont("res/font/gamefont.ttf", 28);
         std::string newHPText = to_string(mainPlayer.party[i].c_hp) + "/" + to_string(mainPlayer.party[i].data->hp); 
         pokeTextHPs[i].textInit(RenderWindow::renderer, newHPText.c_str(), {0,0,0}, 710);
     }

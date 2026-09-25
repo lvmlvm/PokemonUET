@@ -4,18 +4,16 @@
 #include "Variables.h"
 #include <iostream>
 
-static unsigned int NPCsen = 0;
-
 NPC::NPC() {
     npcXCoords = 0, npcYCoords = 0, faceDirection = 0;
     isTrainer = false, hasBattled = 2;
+    npcTexture = NULL;
+    dialogueCursor = 0;
 }
 
 NPC::~NPC() {
-    SDL_DestroyTexture(npcTexture);
+    if (npcTexture != NULL) SDL_DestroyTexture(npcTexture);
     npcTexture = NULL;
-    dialogueTexts.clear();
-    preBattleTexts.clear();
 }
 
 void NPC::initNPC(int x, int y, int face, const char* texturePath, bool canBattle) {
@@ -23,11 +21,16 @@ void NPC::initNPC(int x, int y, int face, const char* texturePath, bool canBattl
 
     if (isTrainer) hasBattled = 0;
 
+    if (npcTexture != NULL) SDL_DestroyTexture(npcTexture);
+    npcTexture = NULL;
     SDL_Surface* tempSurface = IMG_Load(texturePath);
-    SDL_SetColorKey(tempSurface, SDL_TRUE, SDL_MapRGB(tempSurface->format, 0, 255, 255));
-    npcTexture = SDL_CreateTextureFromSurface(RenderWindow::renderer, tempSurface);
-    SDL_FreeSurface(tempSurface);
-    tempSurface = NULL;
+    if (tempSurface == NULL) {
+        std::cerr << "Failed to load " << texturePath << ": " << IMG_GetError() << '\n';
+    } else {
+        SDL_SetColorKey(tempSurface, SDL_TRUE, SDL_MapRGB(tempSurface->format, 0, 255, 255));
+        npcTexture = SDL_CreateTextureFromSurface(RenderWindow::renderer, tempSurface);
+        SDL_FreeSurface(tempSurface);
+    }
     
     for (int i = 0; i < 16; i++) {
         walkFrames[i] = {i*64, 0, 64, 88};
@@ -76,31 +79,31 @@ bool NPC::talkNPC(int playerFace) {
     if (isTrainer == true)
     {
         if (hasBattled == 0) {
-            if (NPCsen < preBattleTexts.size()) {
-                NPCsen++;
+            if (dialogueCursor < preBattleTexts.size()) {
+                dialogueCursor++;
                 return true;
             } else {
-                NPCsen = 0;
+                dialogueCursor = 0;
                 beginMapToBattleTransition = true;
                 return false;
             }
         } else {
-            if (NPCsen < dialogueTexts.size()) {
-                NPCsen++;
+            if (dialogueCursor < dialogueTexts.size()) {
+                dialogueCursor++;
                 return true;
             } else {
-                NPCsen = 0;
+                dialogueCursor = 0;
                 return false;
             }
         }
     } 
     else
     {
-        if (NPCsen < dialogueTexts.size()) {
-            NPCsen++;
+        if (dialogueCursor < dialogueTexts.size()) {
+            dialogueCursor++;
             return true;
         } else {
-            NPCsen = 0;
+            dialogueCursor = 0;
             return false;
         }
     }
@@ -125,13 +128,11 @@ void NPC::initPreBattleDialogue(std::string nextSentence) {
 
 std::string NPC::getCurrentSentence()
 {
-    if (isTrainer == true and hasBattled == 0) {
-        return preBattleTexts[NPCsen - 1];
-    } else {
-        return dialogueTexts[NPCsen - 1];
-    }
+    const std::vector<std::string>& texts = (isTrainer == true and hasBattled == 0) ? preBattleTexts : dialogueTexts;
+    if (dialogueCursor == 0 or dialogueCursor > texts.size()) return "";
+    return texts[dialogueCursor - 1];
 }
 
 int NPC::getCurrentSentenceID() {
-    return NPCsen;
+    return dialogueCursor;
 }

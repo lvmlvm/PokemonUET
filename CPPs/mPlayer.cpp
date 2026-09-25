@@ -1,6 +1,7 @@
 #include "mPlayer.h"
 #include "RenderWindow.h"
 #include "Battle.h"
+#include "Variables.h"
 
 #include <iostream>
 #include <fstream>
@@ -22,7 +23,11 @@ mPlayer::mPlayer() {
 }
 
 mPlayer::~mPlayer() {
-    SDL_DestroyTexture(playerTexture);
+    freePlayer();
+}
+
+void mPlayer::freePlayer() {
+    if (playerTexture != NULL) SDL_DestroyTexture(playerTexture);
     playerTexture = NULL;
     playerScoreList.freeHighScoreList();
 }
@@ -41,17 +46,32 @@ bool mPlayer::loadPlayerData() {
         playerDatInStream >> gender >> currentMap >> xCoords >> yCoords; // PLAYER LOCATION
 
         // PLAYER POKEMON DATA
-        int party0, party1, party2;
-        playerDatInStream >> party0 >> party1 >> party2;
-        party[0] = party0, party[1] = party1, party[2] = party2;
+        int partyIDs[3] = {0, 0, 0};
+        playerDatInStream >> partyIDs[0] >> partyIDs[1] >> partyIDs[2];
 
         // PLAYER HIGH SCORE DATA
-        int highScores[5];
+        int highScores[5] = {0, 0, 0, 0, 0};
         playerDatInStream >> currentHighScore;
         for (int i = 0; i < 5; i++) playerDatInStream >> highScores[i];
-        playerScoreList.loadHighScoreList(highScores);
 
-        playerDatInStream.close();
+        // REJECT CORRUPTED SAVES INSTEAD OF INDEXING OUT OF BOUNDS WITH THEIR VALUES
+        bool valid = !playerDatInStream.fail() && (gender == 0 || gender == 1)
+            && currentMap >= 0 && currentMap < MAP_COUNT && xCoords >= 0 && yCoords >= 0 && currentHighScore >= 0;
+        for (int id : partyIDs) valid = valid && id >= 0 && id < psize;
+        for (int score : highScores) valid = valid && score >= 0;
+
+        if (valid) {
+            for (int i = 0; i < 3; i++) party[i] = partyIDs[i];
+            playerScoreList.loadHighScoreList(highScores);
+        } else {
+            std::cout << "Save file is corrupted! Default player config loaded instead!\n";
+            gender = 0;
+            name = "Player";
+            currentMap = 1;
+            xCoords = 20, yCoords = 10;
+            currentHighScore = 0;
+            success = false;
+        }
     }
 
     return success;
@@ -81,7 +101,6 @@ void mPlayer::resetPlayerData() {
     faceDirection = 0;
     currentHighScore = 0;
     playerScoreList.resetHighScoreList();
-    SDL_DestroyTexture(playerTexture);
     initPlayerTexture();
     party[0] = 0;
     party[1] = 0;
@@ -113,21 +132,21 @@ int mPlayer::getFacingDirection() {
 }
 
 void mPlayer::initPlayerTexture() {
+    if (playerTexture != NULL) SDL_DestroyTexture(playerTexture);
+    playerTexture = NULL;
     if (gender == -1) {
         std::cout << "Player gender uninitiated!\n";
-    } else {
-        SDL_Surface* tempSurface;
-        if (gender == 0) {
-            tempSurface = IMG_Load("res/playersprite/malesprite.png");
-            SDL_SetColorKey(tempSurface, SDL_TRUE, SDL_MapRGB(tempSurface->format, 0, 255, 255));
-            playerTexture = SDL_CreateTextureFromSurface(RenderWindow::renderer, tempSurface);
-        } else {
-            tempSurface = IMG_Load("res/playersprite/femalesprite.png");
-            SDL_SetColorKey(tempSurface, SDL_TRUE, SDL_MapRGB(tempSurface->format, 0, 255, 255));
-            playerTexture = SDL_CreateTextureFromSurface(RenderWindow::renderer, tempSurface);
-        }
-        SDL_FreeSurface(tempSurface);
+        return;
     }
+    const char* path = gender == 0 ? "res/playersprite/malesprite.png" : "res/playersprite/femalesprite.png";
+    SDL_Surface* tempSurface = IMG_Load(path);
+    if (tempSurface == NULL) {
+        std::cerr << "Failed to load " << path << ": " << IMG_GetError() << '\n';
+        return;
+    }
+    SDL_SetColorKey(tempSurface, SDL_TRUE, SDL_MapRGB(tempSurface->format, 0, 255, 255));
+    playerTexture = SDL_CreateTextureFromSurface(RenderWindow::renderer, tempSurface);
+    SDL_FreeSurface(tempSurface);
 }
 
 void mPlayer::setPlayerCoords(int x, int y, int mapID) {
@@ -148,7 +167,6 @@ void mPlayer::setPlayerGender(int _gender) {
         name = "Sapphire";
         gender = 1;
     }
-    SDL_DestroyTexture(playerTexture);
     initPlayerTexture();
 }
 
@@ -229,11 +247,16 @@ void swap(int &a, int &b) {
     b = c;
 }
 
-HighScoreList::HighScoreList() {}
+HighScoreList::HighScoreList() {
+    head = NULL;
+    highScoreScreenText = NULL;
+    highScoreScreenRect = {0, 0, 0, 0};
+}
 
 HighScoreList::~HighScoreList() {}
 
 void HighScoreList::initHighScoreList() {
+    freeHighScoreList();
     head = new HighScoreListNode(0);
     HighScoreListNode* iterNode = head;
     for (int i = 0; i < 4; i++) {
@@ -257,10 +280,12 @@ void HighScoreList::freeHighScoreList() {
         p = p->nextHighScore;
         delete p1;
     }
+    head = NULL;
 
-    SDL_DestroyTexture(highScoreScreenText);
+    if (highScoreScreenText != NULL) SDL_DestroyTexture(highScoreScreenText);
+    highScoreScreenText = NULL;
     for (int i = 0; i < 5; i++) highScoreTexts[i].freeText();
-    backButton.~MenuButton();
+    backButton.freeButton();
 }
 
 void HighScoreList::loadHighScoreList(int highScoreList[]) {

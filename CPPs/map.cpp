@@ -6,6 +6,7 @@
 #include "map.h"
 #include "RenderWindow.h"
 #include "Tiling.h"
+#include "rng.h"
 
 using namespace std;
 
@@ -89,6 +90,11 @@ void Map::loadMap(const char* path, const char* sheetPath, const char* musicPath
     inputmap >> mapID;
     inputmap >> mapHeight;
     inputmap >> mapWidth;
+    if (!inputmap or mapHeight <= 0 or mapWidth <= 0) {
+        cerr << "Failed to load map " << path << '\n';
+        mapHeight = mapWidth = 0;
+        return;
+    }
 
     // Load in the tile texture data
     map = new int*[mapHeight];
@@ -203,8 +209,7 @@ void Map::loadMap(const char* path, const char* sheetPath, const char* musicPath
     }
 
     if (mapID >= 5 and mapID <= 11) {
-        srand(time(NULL));
-        int randDestMap = rand() % 6 + 6;
+        int randDestMap = randomInt(6, 11);
 
         WarpTile* newWarpTile = new WarpTile(12, 7, randDestMap, 12, 22);
         mapWarpTiles.push_back(newWarpTile);
@@ -348,6 +353,7 @@ int** Map::getCollisionMap() {
 }
 
 void Map::popLastNPC() {
+    if (mapNPCs.empty()) return;
     int lastNPC = mapNPCs.size() - 1;
     tilePropMap[mapNPCs[lastNPC]->getY()][mapNPCs[lastNPC]->getX()] = 0;
     delete mapNPCs[lastNPC];
@@ -443,11 +449,10 @@ WarpTile::~WarpTile() {
 
 // INTER TILE CONFIGS
 
-static unsigned int INTERsen = 0;
-
 InterTile::InterTile(int _tileX, int _tileY) {
     tileX = _tileX;
     tileY = _tileY;
+    dialogueCursor = 0;
 }
 
 InterTile::~InterTile() {
@@ -461,20 +466,21 @@ void InterTile::initTileDialogue(std::string nextSentence) {
 }
 
 bool InterTile::talkTile() {
-    if (INTERsen < dialogueTexts.size()) {
-        INTERsen++;
+    if (dialogueCursor < dialogueTexts.size()) {
+        dialogueCursor++;
         return true;
     }
     else {
-        INTERsen = 0;
+        dialogueCursor = 0;
         return false;
     }
 }
 
 std::string InterTile::getInterCurrentSentence() {
-    return dialogueTexts[INTERsen - 1];
+    if (dialogueCursor == 0 or dialogueCursor > dialogueTexts.size()) return "";
+    return dialogueTexts[dialogueCursor - 1];
 }
 
 int InterTile::getInterCurrentSentenceID() {
-    return INTERsen;
+    return dialogueCursor;
 }

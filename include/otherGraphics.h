@@ -48,6 +48,7 @@ class MenuButton {
 		MenuButton();
 		~MenuButton();
 		void initMB(const char* path, int x, int y);
+		void freeButton();
 		void drawButton();
         void buttonHandler();
 };

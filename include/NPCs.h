@@ -16,6 +16,7 @@ private:
     bool isTrainer; // If true then will generate a random battle after the dialouge
     int hasBattled = 2; // 0 = has not battled, 1 = has battled, 2 = not a trainer
     std::string trainerName, trainerPath;
+    unsigned int dialogueCursor; // 1-based index of the sentence being shown, 0 = not talking
 public:
     NPC();
     ~NPC();

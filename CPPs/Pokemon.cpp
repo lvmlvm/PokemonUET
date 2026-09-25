@@ -1,6 +1,5 @@
 #include "Pokemon.h"
-#include <ctime>
-#include <SDL.h>
+#include "rng.h"
 
 Pokemon::Pokemon(int i) {
 	data=pokemonData+i;
@@ -21,8 +20,7 @@ Pokemon::Pokemon() {
 Trainer::Trainer() {
 	name = "Champion Cynthia";
 	battleSpritePath = "res/battleassets/opponentSprite1.png";
-	srand(time(0));
     for (int i=0;i<3;i++) {
-        party[i]=rand()%psize;
+        party[i]=randomInt(1, psize-1);
     }
 }
