@@ -1,6 +1,11 @@
 # Pokémon UET
 Formerly Pokémon VNU but that is only possible if LTNC is the only subject in the semester.
 
+## Major Update
+
+- 29/09/2026: Project Restart?
+- 25/09/2026: Refactored completely with Claude Opus 5.5 (lvm was trying to find a way to utilize his reset)
+
 ## Giới thiệu về Game:
 <img width="960" alt="image" src="https://user-images.githubusercontent.com/29592868/169844629-622cf24d-a0f9-4ed0-bc52-dda1f0b21964.png">
 
